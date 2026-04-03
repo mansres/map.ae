@@ -1,219 +1,712 @@
-<!DOCTYPE html><html><head><title>Map with Markers</title><script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script><!-- Google Analytics --><script async src="https://www.googletagmanager.com/gtag/js?id=G-EX301QT776"></script><script>  window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', 'G-EX301QT776');
-  </script><link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"><script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script><style>#map{height:100vh;width:100%}.control-panel{position:absolute;top:20px;left:20px;z-index:9999;display:grid;gap:20px;pointer-events:auto}.panel-box{background:#fff;padding:15px;border-radius:5px;box-shadow:0 0 10px rgba(0,0,0,.2);min-width:200px}.legend-item{display:flex;align-items:center;margin:5px 0}.legend-color{width:20px;height:20px;margin-right:10px;border:1px solid #ccc}.emirates-select{padding:8px;font-size:14px;border:1px solid #ccc;border-radius:4px;width:100%;cursor:pointer;background-color:#fff;position:relative;z-index:10000}.emirates-select:hover{border-color:#999}.emirates-select:focus{outline:0;border-color:#4a90e2;box-shadow:0 0 0 2px rgba(74,144,226,.2)}h4{margin:0 0 10px 0}.leaflet-popup-content{max-height:300px!important;overflow:auto!important}.filter-item{display:flex;align-items:center;margin:5px 0}.filter-checkbox{margin-right:10px}.filter-label{font-size:14px;color:#333}.select-all-item{border-bottom:1px solid #ccc;padding-bottom:8px;margin-bottom:8px}</style></head><body><div id="map"></div><div class="control-panel"><div class="panel-box"><h4>Price Ranges (AED)</h4><div id="legend-items"></div></div><div class="panel-box"><h4>Select Location</h4><select id="emiratesSelect" class="emirates-select"><option value="0">Select Emirate</option><option value="2" selected="selected">Dubai</option><option value="3">Abu Dhabi</option><option value="12">Sharjah</option><option value="14">Ajman</option><option value="11">Ras Al Khaimah</option><option value="13">Fujairah</option><option value="15">Umm Al Quwain</option></select></div><div class="panel-box"><h4>Property Types</h4><div id="property-type-filters"></div></div><div class="panel-box"><h4>Bedrooms</h4><div id="bedroom-filters"></div></div></div><div id="disclaimerPopup" style="position:absolute;top:89%;left:20px;z-index:9999;display:grid;pointer-events:auto;font-size:small" class="panel-box"><strong>Disclaimer:</strong>This page is for educational and personal study only. It is not affiliated with or endorsed by Dubizzle or any other platform. Do not use this project to access, scrape, or interact with third-party APIs or data sources without proper authorization. Replace all sample or placeholder data with your own legally permitted sources before using this in any real environment.</div><script>var map = L.map("map").setView([25.276987, 55.296249], 11);
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rental Radar</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css">
+
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-EX301QT776"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
+        gtag('config', 'G-EX301QT776');
+    </script>
+
+    <style>
+        :root {
+            --bg-color: #ffffff;
+            --text-primary: #0f172a;
+            --text-sec: #475569;
+            --border-color: #cbd5e1;
+            --primary-color: #2563eb;
+            --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+
+            --dash-bg: rgba(255, 255, 255, 0.98);
+            --dash-border: rgba(255, 255, 255, 0.4);
+            --input-bg: #f8fafc;
+            --popup-bg: #ffffff;
+        }
+
+        body.theme-transparent {
+            --dash-bg: rgba(255, 255, 255, 0);
+            --dash-border: transparent;
+            --shadow-lg: none;
+        }
+
+        body.theme-dark {
+            --text-primary: #f8fafc;
+            --text-sec: #94a3b8;
+            --border-color: #334155;
+            --dash-bg: rgba(15, 23, 42, 0.9);
+            --dash-border: rgba(255, 255, 255, 0.1);
+            --input-bg: #1e293b;
+            --popup-bg: #1e293b;
+        }
+
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: 'Inter', sans-serif;
+            background: #e2e8f0;
+            color: var(--text-primary);
+            overflow: hidden;
+        }
+
+        #map {
+            height: 100vh;
+            width: 100%;
+            z-index: 1;
+        }
+
+        /* Floating Dashboard */
+        .dashboard {
+            position: absolute;
+            top: 24px;
+            left: 24px;
+            width: 340px;
+            max-height: calc(100vh - 48px);
+            background: var(--dash-bg);
+            backdrop-filter: blur(12px);
+            border-radius: 16px;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--dash-border);
+            z-index: 1000;
+            text-shadow: 0 1px 2px rgba(255, 255, 255, 0.7);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .dashboard-header {
+            padding: 24px 24px 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .dashboard-header h1 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        .dashboard-header p {
+            margin: 4px 0 0 0;
+            font-size: 13px;
+            color: var(--text-sec);
+        }
+
+        .dashboard-content {
+            padding: 0 24px 24px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .dashboard-content::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .dashboard-content::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+
+        .form-group {
+            margin-top: 24px;
+        }
+
+        .section-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 700;
+            color: var(--text-sec);
+            margin: 0 0 12px 0;
+        }
+
+        .select-control {
+            width: 100%;
+            padding: 12px 14px;
+            font-size: 14px;
+            font-family: inherit;
+            color: var(--text-primary);
+            background: var(--input-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            outline: none;
+            transition: all 0.2s;
+            cursor: pointer;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .select-control:hover,
+        .select-control:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .checkbox-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .checkbox-item input[type="checkbox"] {
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border: 2px solid #94a3b8;
+            border-radius: 4px;
+            margin-right: 12px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .checkbox-item input[type="checkbox"]:checked {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+
+        .checkbox-item input[type="checkbox"]:checked::after {
+            content: '';
+            position: absolute;
+            left: 5px;
+            top: 2px;
+            width: 4px;
+            height: 8px;
+            border: solid white;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+        }
+
+        .checkbox-label {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-primary);
+            user-select: none;
+        }
+
+        .select-all-item {
+            padding-bottom: 12px;
+            margin-bottom: 4px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .legend-color {
+            width: 14px;
+            height: 14px;
+            border-radius: 4px;
+            margin-right: 12px;
+            box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Custom Markers */
+        .marker-inner {
+            position: relative;
+            width: 24px;
+            height: 24px;
+            border: 2.5px solid white;
+            border-radius: 50% 50% 50% 0;
+            transform: rotate(-45deg);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .marker-inner::after {
+            content: '';
+            width: 8px;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 50%;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .custom-marker:hover .marker-inner {
+            transform: scale(1.2) translateY(-4px) rotate(-45deg) !important;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4) !important;
+            z-index: 2000 !important;
+        }
+
+        /* Popup */
+        .leaflet-popup-content-wrapper {
+            background: var(--popup-bg);
+            border-radius: 12px;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--border-color);
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .leaflet-popup-content {
+            margin: 0;
+            width: 280px !important;
+        }
+
+        .leaflet-popup-tip-container {
+            display: none;
+        }
+
+        .popup-inner {
+            max-height: 380px;
+            overflow-y: auto;
+        }
+
+        .popup-list-item {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .popup-list-item:last-child {
+            border-bottom: none;
+        }
+
+        .popup-price {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+            letter-spacing: -0.02em;
+        }
+
+        .popup-type {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .popup-meta {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 12px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-sec);
+        }
+
+        .popup-desc {
+            font-size: 14px;
+            color: var(--text-sec);
+            line-height: 1.5;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            margin-bottom: 16px;
+        }
+
+        .btn-view {
+            display: block;
+            text-align: center;
+            background: var(--input-bg);
+            color: var(--primary-color);
+            text-decoration: none;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            border: 1px solid var(--border-color);
+            transition: all 0.2s;
+        }
+
+        .btn-view:hover {
+            filter: brightness(0.95);
+        }
+
+        /* Loader Overlay */
+        #loader-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(4px);
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        #loader-overlay.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid #e2e8f0;
+            border-top-color: var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .loader-text {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .disclaimer {
+            position: absolute;
+            bottom: 12px;
+            right: 12px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            color: var(--text-sec);
+            z-index: 1000;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border-color);
+            pointer-events: none;
+        }
+
+        /* Improve Leaflet Controls Position */
+        .leaflet-right .leaflet-control {
+            margin-right: 24px;
+        }
+
+        .leaflet-top .leaflet-control {
+            margin-top: 24px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="loader-overlay" class="active">
+        <div class="spinner"></div>
+        <div class="loader-text">Fetching Market Data...</div>
+    </div>
+
+    <div id="map"></div>
+
+    <div class="dashboard">
+        <div class="dashboard-header">
+            <h1>Rental Radar</h1>
+            <p>Real-time residency map</p>
+        </div>
+        <div class="dashboard-content">
+            <div class="form-group">
+                <h4 class="section-title">Location</h4>
+                <select id="emiratesSelect" class="select-control">
+                    <option value="0">Select Emirate</option>
+                    <option value="2" selected="selected">Dubai</option>
+                    <option value="3">Abu Dhabi</option>
+                    <option value="12">Sharjah</option>
+                    <option value="14">Ajman</option>
+                    <option value="11">Ras Al Khaimah</option>
+                    <option value="13">Fujairah</option>
+                    <option value="15">Umm Al Quwain</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <h4 class="section-title">Price Ranges (AED)</h4>
+                <div id="legend-items" class="checkbox-list"></div>
+            </div>
+
+            <div class="form-group">
+                <h4 class="section-title">Property Type</h4>
+                <div id="property-type-filters" class="checkbox-list"></div>
+            </div>
+
+            <div class="form-group">
+                <h4 class="section-title">Bedrooms</h4>
+                <div id="bedroom-filters" class="checkbox-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="disclaimer" id="disclaimerNode">
+        Educational purposes only. Sample data.
+    </div>
+
+    <!-- Leaflet Scripts -->
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+
+    <script>
+        var map = L.map("map", { zoomControl: false }).setView([25.276987, 55.296249], 11);
+        L.control.zoom({ position: 'topright' }).addTo(map);
+
+        var streetDetailed = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            maxZoom: 19, attribution: "© OpenStreetMap contributors"
+        });
+
+        var darkMap = L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+            maxZoom: 19, attribution: "© CARTO"
+        });
+
+        var lightMap = L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+            maxZoom: 19, attribution: "© CARTO"
+        });
+
+        var esriSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 19, attribution: 'Tiles © Esri'
+        });
+
+        streetDetailed.addTo(map);
+
+        var baseMaps = {
+            "Detailed Streets (Default)": streetDetailed,
+            "Light Mode": lightMap,
+            "Dark Mode": darkMap,
+            "Satellite 3D": esriSatellite
+        };
+
+        L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
+
+        document.body.className = 'theme-transparent'; // Initial loaded theme
+        map.on('baselayerchange', function (e) {
+            document.body.className = '';
+            if (e.name === "Dark Mode") {
+                document.body.classList.add('theme-dark');
+            } else if (e.name === "Detailed Streets (Default)" || e.name === "Satellite 3D") {
+                document.body.classList.add('theme-transparent');
+            }
+        });
+
+
+
         var markers = [];
         var responseData = [];
         var city = 2;
         let propertyTypeFilters = new Set();
-
-
-        // Add OpenStreetMap tiles
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-            maxZoom: 19,
-            attribution: "© OpenStreetMap contributors",
-        }).addTo(map);
+        let bedroomFilters = new Set();
 
         const priceRanges = [
-            { max: 10000, color: '#fff0a5' },
-            { max: 20000, color: '#c6de41' },
-            { max: 30000, color: '#27e1ce' },
-            { max: 40000, color: 'blue' },
-            { max: 50000, color: 'green' },
-            { max: 55000, color: '#f9b248' },
-            { max: 60000, color: '#fb7777' },
-            { max: Infinity, color: '#ff0000' }
+            { max: 20000, color: '#10b981' },
+            { max: 30000, color: '#84cc16' },
+            { max: 40000, color: '#eab308' },
+            { max: 50000, color: '#f59e0b' },
+            { max: 60000, color: '#f97316' },
+            { max: 70000, color: '#ef4444' },
+            { max: Infinity, color: '#be123c' }
         ];
 
         const visibleRanges = new Set(priceRanges.map((_, index) => index));
 
         function getMarkerColor(price) {
             for (const range of priceRanges) {
-                if (price <= range.max) {
-                    return range.color;
-                }
+                if (price <= range.max) return range.color;
             }
-            return 'red';
+            return '#be123c';
         }
 
+        function formatShortPrice(price) {
+            if (price >= 1000000) return (price / 1000000).toFixed(1) + 'M';
+            if (price >= 10000) return Math.round(price / 1000) + 'k';
+            if (price >= 1000) return (price / 1000).toFixed(1) + 'k';
+            return price;
+        }
 
+        // Filters Creation
         function createPropertyTypeFilters() {
             const propertyTypes = new Set();
-
-            // Extract unique property types
             responseData[0].hits.forEach(location => {
                 const propertyInfo = location.property_info.find(info => info.id === 'property_type');
-                if (propertyInfo && propertyInfo.value && propertyInfo.value.en) {
-                    propertyTypes.add(propertyInfo.value.en);
-                }
+                if (propertyInfo && propertyInfo.value && propertyInfo.value.en) propertyTypes.add(propertyInfo.value.en);
             });
 
-            const filterContainer = document.getElementById('property-type-filters');
-            filterContainer.innerHTML = '';
+            const container = document.getElementById('property-type-filters');
+            container.innerHTML = '';
 
-            // Add select all checkbox
-            const selectAllItem = document.createElement('div');
-            selectAllItem.className = 'filter-item select-all-item';
-
-            const selectAllCheckbox = document.createElement('input');
-            selectAllCheckbox.type = 'checkbox';
-            selectAllCheckbox.className = 'filter-checkbox';
-            selectAllCheckbox.checked = true;
-            selectAllCheckbox.id = 'select-all-property-types';
-
-            const selectAllLabel = document.createElement('label');
-            selectAllLabel.className = 'filter-label';
-            selectAllLabel.htmlFor = 'select-all-property-types';
-            selectAllLabel.textContent = 'Select All';
-
-            selectAllItem.appendChild(selectAllCheckbox);
-            selectAllItem.appendChild(selectAllLabel);
-            filterContainer.appendChild(selectAllItem);
-
+            const selectAllCheckboxes = createSelectAll(container, 'select-all-types');
             const typeCheckboxes = [];
+
             propertyTypes.forEach(type => {
-                const item = document.createElement('div');
-                item.className = 'filter-item';
-
-                const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                checkbox.className = 'filter-checkbox';
-                checkbox.checked = true;
-                checkbox.id = `type-${type.toLowerCase().replace(/\s+/g, '-')}`;
-
                 propertyTypeFilters.add(type);
-                typeCheckboxes.push(checkbox);
+                const obj = createFilterItem('type-' + btoa(type).replace(/=/g, ''), type);
+                typeCheckboxes.push(obj.checkbox);
 
-                const label = document.createElement('label');
-                label.className = 'filter-label';
-                label.htmlFor = checkbox.id;
-                label.textContent = type;
-
-                checkbox.addEventListener('change', (e) => {
-                    if (e.target.checked) {
-                        propertyTypeFilters.add(type);
-                    } else {
-                        propertyTypeFilters.delete(type);
-                    }
-                    // Update select all checkbox state
-                    selectAllCheckbox.checked = typeCheckboxes.every(cb => cb.checked);
+                obj.checkbox.addEventListener('change', (e) => {
+                    if (e.target.checked) propertyTypeFilters.add(type);
+                    else propertyTypeFilters.delete(type);
+                    selectAllCheckboxes.checked = typeCheckboxes.every(cb => cb.checked);
                     updateMarkerVisibility();
                 });
-
-                item.appendChild(checkbox);
-                item.appendChild(label);
-                filterContainer.appendChild(item);
+                container.appendChild(obj.item);
             });
 
-            // Add select all functionality
-            selectAllCheckbox.addEventListener('change', (e) => {
+            selectAllCheckboxes.addEventListener('change', (e) => {
                 const isChecked = e.target.checked;
-                typeCheckboxes.forEach(checkbox => {
-                    checkbox.checked = isChecked;
-                    const type = checkbox.id.replace('type-', '').replace(/-/g, ' ');
-                    if (isChecked) {
-                        propertyTypeFilters.add(type);
-                    } else {
-                        propertyTypeFilters.delete(type);
-                    }
+                typeCheckboxes.forEach((cb, idx) => {
+                    cb.checked = isChecked;
+                    const type = Array.from(propertyTypes)[idx];
+                    if (isChecked) propertyTypeFilters.add(type);
+                    else propertyTypeFilters.delete(type);
                 });
                 updateMarkerVisibility();
             });
         }
 
         function createLegend() {
-            const legendContainer = document.getElementById('legend-items');
-            legendContainer.innerHTML = '';
+            const container = document.getElementById('legend-items');
+            container.innerHTML = '';
 
-            // Add select all checkbox
-            const selectAllItem = document.createElement('div');
-            selectAllItem.className = 'legend-item select-all-item';
-
-            const selectAllCheckbox = document.createElement('input');
-            selectAllCheckbox.type = 'checkbox';
-            selectAllCheckbox.className = 'legend-checkbox';
-            selectAllCheckbox.checked = true;
-            selectAllCheckbox.id = 'select-all-prices';
-
-            const selectAllLabel = document.createElement('span');
-            selectAllLabel.textContent = 'Select All';
-
-            selectAllItem.appendChild(selectAllCheckbox);
-            selectAllItem.appendChild(selectAllLabel);
-            legendContainer.appendChild(selectAllItem);
-
+            const selectAllCheckboxes = createSelectAll(container, 'select-all-prices');
             const priceCheckboxes = [];
+
             priceRanges.forEach((range, index) => {
-                const item = document.createElement('div');
-                item.className = 'legend-item';
+                const item = document.createElement('label');
+                item.className = 'checkbox-item popup-list-item';
+                item.style.padding = '0'; item.style.border = 'none';
 
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
-                checkbox.className = 'legend-checkbox';
                 checkbox.checked = true;
                 priceCheckboxes.push(checkbox);
-
-                checkbox.addEventListener('change', () => {
-                    togglePriceRange(index);
-                    // Update select all checkbox state
-                    selectAllCheckbox.checked = priceCheckboxes.every(cb => cb.checked);
-                });
 
                 const colorBox = document.createElement('div');
                 colorBox.className = 'legend-color';
                 colorBox.style.backgroundColor = range.color;
 
                 const label = document.createElement('span');
-                label.textContent = range.max === Infinity ?
-                    `Above ${priceRanges[priceRanges.length - 2].max}` :
-                    `Up to ${range.max}`;
+                label.className = 'checkbox-label';
+                label.textContent = range.max === Infinity ? `Above ${priceRanges[priceRanges.length - 2].max}` : `Up to ${range.max}`;
+
+                checkbox.addEventListener('change', () => {
+                    if (checkbox.checked) visibleRanges.add(index);
+                    else visibleRanges.delete(index);
+                    selectAllCheckboxes.checked = priceCheckboxes.every(cb => cb.checked);
+                    updateMarkerVisibility();
+                });
 
                 item.appendChild(checkbox);
                 item.appendChild(colorBox);
                 item.appendChild(label);
-                legendContainer.appendChild(item);
+                container.appendChild(item);
             });
 
-            // Add select all functionality
-            selectAllCheckbox.addEventListener('change', (e) => {
+            selectAllCheckboxes.addEventListener('change', (e) => {
                 const isChecked = e.target.checked;
-                priceCheckboxes.forEach((checkbox, index) => {
-                    checkbox.checked = isChecked;
-                    if (isChecked) {
-                        visibleRanges.add(index);
-                    } else {
-                        visibleRanges.delete(index);
-                    }
+                priceCheckboxes.forEach((cb, index) => {
+                    cb.checked = isChecked;
+                    if (isChecked) visibleRanges.add(index);
+                    else visibleRanges.delete(index);
                 });
                 updateMarkerVisibility();
             });
         }
 
-        function togglePriceRange(index) {
-            if (visibleRanges.has(index)) {
-                visibleRanges.delete(index);
-            } else {
-                visibleRanges.add(index);
-            }
-            updateMarkerVisibility();
+        function createBedroomFilters() {
+            const bedrooms = new Set();
+            responseData[0].hits.forEach(loc => {
+                if (typeof loc.bedrooms === 'number') bedrooms.add(loc.bedrooms);
+            });
+
+            const sorted = Array.from(bedrooms).sort((a, b) => a - b);
+            const container = document.getElementById('bedroom-filters');
+            container.innerHTML = '';
+
+            const selectAllCheckboxes = createSelectAll(container, 'select-all-beds');
+            bedroomFilters = new Set(sorted);
+            const bedCheckboxes = [];
+
+            sorted.forEach(count => {
+                const labelText = count === 0 ? 'Studio' : `${count} Bed${count > 1 ? 's' : ''}`;
+                const obj = createFilterItem(`bed-${count}`, labelText);
+                bedCheckboxes.push(obj.checkbox);
+
+                obj.checkbox.addEventListener('change', (e) => {
+                    if (e.target.checked) bedroomFilters.add(count);
+                    else bedroomFilters.delete(count);
+                    selectAllCheckboxes.checked = bedCheckboxes.every(cb => cb.checked);
+                    updateMarkerVisibility();
+                });
+                container.appendChild(obj.item);
+            });
+
+            selectAllCheckboxes.addEventListener('change', (e) => {
+                const isChecked = e.target.checked;
+                bedCheckboxes.forEach((cb, idx) => {
+                    cb.checked = isChecked;
+                    const count = sorted[idx];
+                    if (isChecked) bedroomFilters.add(count);
+                    else bedroomFilters.delete(count);
+                });
+                updateMarkerVisibility();
+            });
+        }
+
+        function createSelectAll(container, id) {
+            const item = document.createElement('label');
+            item.className = 'checkbox-item select-all-item';
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox'; checkbox.checked = true; checkbox.id = id;
+            const label = document.createElement('span');
+            label.className = 'checkbox-label'; label.textContent = 'Select All';
+            item.appendChild(checkbox); item.appendChild(label);
+            container.appendChild(item);
+            return checkbox;
+        }
+
+        function createFilterItem(id, text) {
+            const item = document.createElement('label');
+            item.className = 'checkbox-item';
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox'; checkbox.checked = true; checkbox.id = id;
+            const label = document.createElement('span');
+            label.className = 'checkbox-label'; label.textContent = text;
+            item.appendChild(checkbox); item.appendChild(label);
+            return { item, checkbox };
         }
 
         function updateMarkerVisibility() {
             markers.forEach(marker => {
                 const price = marker.price;
-                const propertyInfo = marker.propertyData.property_info.find(info => info.id === 'property_type');
-                const propertyType = propertyInfo?.value?.en;
+                const propertyTypeInfo = marker.propertyData.property_info.find(i => i.id === 'property_type');
+                const propertyType = propertyTypeInfo && propertyTypeInfo.value ? propertyTypeInfo.value.en : undefined;
                 const bedrooms = marker.propertyData.bedrooms;
 
-                let rangeIndex = priceRanges.findIndex(range => price <= range.max);
+                let rangeIndex = priceRanges.findIndex(r => price <= r.max);
                 if (rangeIndex === -1) rangeIndex = priceRanges.length - 1;
 
-                const isPriceVisible = visibleRanges.has(rangeIndex);
-                const isTypeVisible = propertyType && propertyTypeFilters.has(propertyType);
-                const isBedroomVisible = bedroomFilters.has(bedrooms);
-
-                if (isPriceVisible && isTypeVisible && isBedroomVisible) {
+                if (visibleRanges.has(rangeIndex) &&
+                    propertyType && propertyTypeFilters.has(propertyType) &&
+                    bedroomFilters.has(bedrooms)) {
                     marker.addTo(map);
                 } else {
                     marker.removeFrom(map);
@@ -222,240 +715,151 @@
         }
 
         function loadMarkers() {
-            // Clear existing markers
             markers.forEach(marker => map.removeLayer(marker));
             markers = [];
-
-            // Group markers by location
             const locationGroups = {};
 
-            responseData[0].hits.forEach((location) => {
-                if (location._geoloc && location._geoloc.lat && location._geoloc.lng) {
-                    const key = `${location._geoloc.lat},${location._geoloc.lng}`;
-                    if (!locationGroups[key]) {
-                        locationGroups[key] = [];
-                    }
-                    locationGroups[key].push(location);
+            responseData[0].hits.forEach(loc => {
+                if (loc._geoloc && loc._geoloc.lat && loc._geoloc.lng) {
+                    const key = `${loc._geoloc.lat},${loc._geoloc.lng}`;
+                    if (!locationGroups[key]) locationGroups[key] = [];
+                    locationGroups[key].push(loc);
                 }
             });
 
-            // Create markers for each location group
             Object.entries(locationGroups).forEach(([coords, locations]) => {
-                const [lat, lng] = coords.split(',').map(Number);
-
-                const lowestPrice = Math.min(...locations.map(loc => loc.price));
+                const coordsArr = coords.split(',');
+                const lat = Number(coordsArr[0]);
+                const lng = Number(coordsArr[1]);
+                const lowestPrice = Math.min(...locations.map(l => l.price));
+                const color = getMarkerColor(lowestPrice);
 
                 const markerIcon = L.divIcon({
                     className: "custom-marker",
-                    html: `
-                <div style="
-                    position: relative;
-                    width: 28px;
-                    height: 28px;
-                    background: ${getMarkerColor(lowestPrice)};
-                    border: 2px solid white;
-                    border-radius: 50% 50% 50% 0;
-                    transform: rotate(-45deg);
-                    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-                ">
-                    <div style="
-                        box-shadow: inset 0 0 3px rgba(0,0,0,0.3);
-                    "></div>
-                </div>
-            `,
-                    iconSize: [28, 40],
-                    iconAnchor: [14, 40],
+                    html: `<div class="marker-inner" style="background: ${color};"></div>`,
+                    iconSize: [24, 34],
+                    iconAnchor: [12, 34],
                     popupAnchor: [0, -30]
                 });
 
                 const marker = L.marker([lng, lat], { icon: markerIcon });
-
-                // Store all locations with the marker
-                marker.allLocations = locations;
                 marker.price = lowestPrice;
                 marker.propertyData = locations[0];
 
-                // Create dynamic popup content based on filters
+
+
                 marker.bindPopup(() => {
-                    const filteredLocations = locations.filter(location => {
-                        const propertyInfo = location.property_info.find(info => info.id === 'property_type');
-                        const propertyType = propertyInfo?.value?.en;
-                        const bedrooms = location.bedrooms;
-
-                        let rangeIndex = priceRanges.findIndex(range => location.price <= range.max);
-                        if (rangeIndex === -1) rangeIndex = priceRanges.length - 1;
-
-                        const isPriceVisible = visibleRanges.has(rangeIndex);
-                        const isTypeVisible = propertyType && propertyTypeFilters.has(propertyType);
-                        const isBedroomVisible = bedroomFilters.has(bedrooms);
-
-                        return isPriceVisible && isTypeVisible && isBedroomVisible;
+                    const filteredLocations = locations.filter(loc => {
+                        const pTypeInfo = loc.property_info.find(i => i.id === 'property_type');
+                        const pType = pTypeInfo && pTypeInfo.value ? pTypeInfo.value.en : undefined;
+                        let rIdx = priceRanges.findIndex(r => loc.price <= r.max);
+                        if (rIdx === -1) rIdx = priceRanges.length - 1;
+                        return visibleRanges.has(rIdx) && pType && propertyTypeFilters.has(pType) && bedroomFilters.has(loc.bedrooms);
                     });
 
-                    const popupContent = filteredLocations.map(location => {
-                        const propertyType = location.property_info.find(info => info.id === "property_type")?.value?.en || "N/A";
+                    const popupContent = filteredLocations.map(loc => {
+                        const pTypeInfo2 = loc.property_info.find(i => i.id === "property_type");
+                        const pType = pTypeInfo2 && pTypeInfo2.value ? pTypeInfo2.value.en : "N/A";
+                        const priceFmt = new Intl.NumberFormat('en-AE', { style: 'currency', currency: 'AED', maximumFractionDigits: 0 }).format(loc.price);
+                        const beds = loc.bedrooms === 0 ? 'Studio' : `${loc.bedrooms} Bed`;
+                        const size = loc.size ? `${loc.size} sqft` : '';
+
                         return `
-                    <div style="border-bottom: 1px solid #ccc; padding: 5px 0;">
-                        <p>Price: ${location.price} | Type: ${propertyType}</p>
-                        <p>${location.description_short}</p>
-                        <a href="${location.absolute_url.en}" target="_blank">[LINK]</a>
-                    </div>
-                `;
+                            <div class="popup-list-item">
+                                <div class="popup-price">${priceFmt}</div>
+                                <div class="popup-type">${pType}</div>
+                                <div class="popup-meta">
+                                    <span>🛏️ ${beds}</span>
+                                    ${size ? `<span>📏 ${size}</span>` : ''}
+                                </div>
+                                <div class="popup-desc">${loc.description_short || 'No description available.'}</div>
+                                <a href="${loc.absolute_url && loc.absolute_url.en ? loc.absolute_url.en : '#'}" target="_blank" class="btn-view">View</a>
+                            </div>
+                        `;
                     }).join('');
 
-                    return `<div>${popupContent}</div>`;
+                    return `<div class="popup-inner">${popupContent || '<div class="popup-list-item">No matching properties.</div>'}</div>`;
                 });
 
-                marker.addTo(map);
                 markers.push(marker);
+                marker.addTo(map);
             });
         }
-        function loadMap() {
-            fetch("https://wd0ptz13zs-dsn.algolia.net/1/indexes/*/queries?x-algolia-agent=Algolia%20for%20JavaScript%20(4.24.0)%3B%20Browser%20(lite)&x-algolia-api-key=cef139620248f1bc328a00fddc7107a6&x-algolia-application-id=WD0PTZ13ZS",
-                {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        requests: [
-                            {
-                                indexName: "property-for-rent-residential.com",
-                                query: "",
-                                // params: `page=0&attributesToHighlight=%5B%5D&hitsPerPage=100000&attributesToRetrieve=%5B%22id%22%2C%22category_id%22%2C%22objectID%22%2C%22name%22%2C%22property_reference%22%2C%22price%22%2C%22featured_listing%22%2C%22has_tour_url%22%2C%22has_video_url%22%2C%22is_verified%22%2C%22listed_by%22%2C%22categories%22%2C%22agent%22%2C%22bedrooms%22%2C%22bathrooms%22%2C%22size%22%2C%22neighborhoods%22%2C%22city%22%2C%22building%22%2C%22photos%22%2C%22promoted%22%2C%22tour_360%22%2C%22photos_count%22%2C%22added%22%2C%22video_url%22%2C%22has_dld_history%22%2C%22tour_url%22%2C%22highlighted_ad%22%2C%22has_whatsapp_number%22%2C%22has_agents_whatsapp%22%2C%22has_sms_number%22%2C%22short_url%22%2C%22absolute_url%22%2C%22id%22%2C%22category_id%22%2C%22badges%22%2C%22room_type%22%2C%22uuid%22%2C%22can_chat%22%2C%22is_premium_ad%22%2C%22description_short%22%2C%22_geoloc%22%2C%22completion_status%22%2C%22is_verified_user%22%2C%22agent_profile%22%2C%22payment_frequency%22%2C%22furnished%22%2C%22is_developer_listing%22%2C%22sale_type%22%2C%22sale_type_2%22%2C%22handover_date%22%2C%22payment_plan%22%2C%22original_price%22%2C%22amount_paid%22%2C%22property_info%22%2C%22is_emirati_agent%22%2C%22external_id%22%5D&facets=%5B%22language%22%5D&filters=(bathrooms%3D2.0)%20AND%20(%22bedrooms%22%3D1.0%20OR%20%22bedrooms%22%3D2.0%20OR%20%22bedrooms%22%3D3.0%20OR%20%22bedrooms%22%3D4.0%20OR%20%22bedrooms%22%3D5.0)%20AND%20(%22categories_v2.slug_paths%22%3A%22property-for-rent%2Fresidential%22)%20AND%20(price%3A10000%20TO%2080000)%20AND%20(%22city.id%22%3D${city})`
-                                params: `page=0&attributesToHighlight=%5B%5D&hitsPerPage=100000&attributesToRetrieve=%5B%22id%22%2C%22category_id%22%2C%22objectID%22%2C%22name%22%2C%22property_reference%22%2C%22price%22%2C%22featured_listing%22%2C%22has_tour_url%22%2C%22has_video_url%22%2C%22is_verified%22%2C%22listed_by%22%2C%22categories%22%2C%22agent%22%2C%22bedrooms%22%2C%22bathrooms%22%2C%22size%22%2C%22neighborhoods%22%2C%22city%22%2C%22building%22%2C%22photos%22%2C%22promoted%22%2C%22tour_360%22%2C%22photos_count%22%2C%22added%22%2C%22video_url%22%2C%22has_dld_history%22%2C%22tour_url%22%2C%22highlighted_ad%22%2C%22has_whatsapp_number%22%2C%22has_agents_whatsapp%22%2C%22has_sms_number%22%2C%22short_url%22%2C%22absolute_url%22%2C%22id%22%2C%22category_id%22%2C%22badges%22%2C%22room_type%22%2C%22uuid%22%2C%22can_chat%22%2C%22is_premium_ad%22%2C%22description_short%22%2C%22_geoloc%22%2C%22completion_status%22%2C%22is_verified_user%22%2C%22agent_profile%22%2C%22payment_frequency%22%2C%22furnished%22%2C%22is_developer_listing%22%2C%22sale_type%22%2C%22sale_type_2%22%2C%22handover_date%22%2C%22payment_plan%22%2C%22original_price%22%2C%22amount_paid%22%2C%22property_info%22%2C%22is_emirati_agent%22%2C%22external_id%22%5D&facets=%5B%22language%22%5D&filters=(%22categories_v2.slug_paths%22%3A%22property-for-rent%2Fresidential%22)%20AND%20(price%3A10000%20TO%2080000)%20AND%20(%22city.id%22%3D${city})`
-                            },
-                        ],
-                    }),
+
+        function setOverlay(show, errorText = null) {
+            const overlay = document.getElementById('loader-overlay');
+            if (show) {
+                overlay.classList.add('active');
+                if (errorText) {
+                    overlay.innerHTML = `<div style="color: #ef4444; font-size: 40px; margin-bottom: 16px;">⚠️</div><div class="loader-text" style="color: #ef4444; text-align: center; max-width: 80%;">${errorText}</div>`;
+                } else {
+                    overlay.innerHTML = `<div class="spinner"></div><div class="loader-text">Fetching Market Data...</div>`;
                 }
-            )
-                .then((res) => res.json())
-                .then((data) => {
+            } else {
+                overlay.classList.remove('active');
+            }
+        }
+
+        function loadMap() {
+            setOverlay(true);
+            const queryPayload = {
+                requests: [{
+                    indexName: "property-for-rent-residential.com",
+                    query: "",
+                    params: `page=0&attributesToHighlight=%5B%5D&hitsPerPage=100000&attributesToRetrieve=%5B%22id%22%2C%22category_id%22%2C%22objectID%22%2C%22name%22%2C%22property_reference%22%2C%22price%22%2C%22featured_listing%22%2C%22has_tour_url%22%2C%22has_video_url%22%2C%22is_verified%22%2C%22listed_by%22%2C%22categories%22%2C%22agent%22%2C%22bedrooms%22%2C%22bathrooms%22%2C%22size%22%2C%22neighborhoods%22%2C%22city%22%2C%22building%22%2C%22photos%22%2C%22promoted%22%2C%22tour_360%22%2C%22photos_count%22%2C%22added%22%2C%22video_url%22%2C%22has_dld_history%22%2C%22tour_url%22%2C%22highlighted_ad%22%2C%22has_whatsapp_number%22%2C%22has_agents_whatsapp%22%2C%22has_sms_number%22%2C%22short_url%22%2C%22absolute_url%22%2C%22id%22%2C%22category_id%22%2C%22badges%22%2C%22room_type%22%2C%22uuid%22%2C%22can_chat%22%2C%22is_premium_ad%22%2C%22description_short%22%2C%22_geoloc%22%2C%22completion_status%22%2C%22is_verified_user%22%2C%22agent_profile%22%2C%22payment_frequency%22%2C%22furnished%22%2C%22is_developer_listing%22%2C%22sale_type%22%2C%22sale_type_2%22%2C%22handover_date%22%2C%22payment_plan%22%2C%22original_price%22%2C%22amount_paid%22%2C%22property_info%22%2C%22is_emirati_agent%22%2C%22external_id%22%5D&facets=%5B%22language%22%5D&filters=(%22categories_v2.slug_paths%22%3A%22property-for-rent%2Fresidential%22)%20AND%20(price%3A10000%20TO%2080000)%20AND%20(%22city.id%22%3D${city})`
+                }]
+            };
+
+            fetch("https://rental-map-proxy.mansoor-infos.workers.dev", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(queryPayload)
+            })
+                .then(res => {
+                    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+                    return res.json();
+                })
+                .then(data => {
+                    if (!data || !data.results || !data.results[0] || !data.results[0].hits) {
+                        throw new Error("Invalid format received from API.");
+                    }
                     responseData = data.results;
                     loadMarkers();
                     createLegend();
                     createPropertyTypeFilters();
                     createBedroomFilters();
+                    setOverlay(false);
+                })
+                .catch(err => {
+                    console.error("API Fetch Error:", err);
+                    setOverlay(true, `Error loading data: ${err.message}<br><br>The API may be blocking access (e.g. 403 Forbidden).<br>Please verify your API Key and Network.`);
                 });
         }
 
-        let bedroomFilters = new Set();
-
-        function createBedroomFilters() {
-            const bedrooms = new Set();
-
-            responseData[0].hits.forEach(location => {
-                if (typeof location.bedrooms === 'number') {
-                    bedrooms.add(location.bedrooms);
-                }
-            });
-
-            const sortedBedrooms = Array.from(bedrooms).sort((a, b) => a - b);
-            const filterContainer = document.getElementById('bedroom-filters');
-            filterContainer.innerHTML = '';
-
-            // Add select all checkbox
-            const selectAllItem = document.createElement('div');
-            selectAllItem.className = 'filter-item select-all-item';
-
-            const selectAllCheckbox = document.createElement('input');
-            selectAllCheckbox.type = 'checkbox';
-            selectAllCheckbox.className = 'filter-checkbox';
-            selectAllCheckbox.checked = true;
-            selectAllCheckbox.id = 'select-all-bedrooms';
-
-            const selectAllLabel = document.createElement('label');
-            selectAllLabel.className = 'filter-label';
-            selectAllLabel.htmlFor = 'select-all-bedrooms';
-            selectAllLabel.textContent = 'Select All';
-
-            selectAllItem.appendChild(selectAllCheckbox);
-            selectAllItem.appendChild(selectAllLabel);
-            filterContainer.appendChild(selectAllItem);
-
-            bedroomFilters = new Set(sortedBedrooms);
-            const bedroomCheckboxes = [];
-
-            sortedBedrooms.forEach(count => {
-                const item = document.createElement('div');
-                item.className = 'filter-item';
-
-                const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                checkbox.className = 'filter-checkbox';
-                checkbox.checked = true;
-                checkbox.id = `bedroom-${count}`;
-                bedroomCheckboxes.push(checkbox);
-
-                const label = document.createElement('label');
-                label.className = 'filter-label';
-                label.htmlFor = checkbox.id;
-                label.textContent = count === 0 ? 'Studio' : `${count} ${count === 1 ? 'Bedroom' : 'Bedrooms'}`;
-
-                checkbox.addEventListener('change', (e) => {
-                    if (e.target.checked) {
-                        bedroomFilters.add(count);
-                    } else {
-                        bedroomFilters.delete(count);
-                    }
-                    // Update select all checkbox state
-                    selectAllCheckbox.checked = bedroomCheckboxes.every(cb => cb.checked);
-                    updateMarkerVisibility();
-                });
-
-                item.appendChild(checkbox);
-                item.appendChild(label);
-                filterContainer.appendChild(item);
-            });
-
-            // Add select all functionality
-            selectAllCheckbox.addEventListener('change', (e) => {
-                const isChecked = e.target.checked;
-                bedroomCheckboxes.forEach(checkbox => {
-                    checkbox.checked = isChecked;
-                    const count = parseInt(checkbox.id.replace('bedroom-', ''));
-                    if (isChecked) {
-                        bedroomFilters.add(count);
-                    } else {
-                        bedroomFilters.delete(count);
-                    }
-                });
-                updateMarkerVisibility();
-            });
-        }
         $(function () {
             loadMap();
 
             document.getElementById('emiratesSelect').addEventListener('change', function (e) {
                 const emirate = e.target.value;
                 switch (emirate) {
-                    case '2':
-                        map.setView([25.276987, 55.296249], 11);
-                        break;
-                    case '3':
-                        map.setView([24.453884, 54.377344], 11);
-                        break;
-                    case '12':
-                        map.setView([25.357290, 55.391109], 11);
-                        break;
-                    case '14':
-                        map.setView([25.411111, 55.435278], 11);
-                        break;
-                    case '11':
-                        map.setView([25.789097, 55.937594], 11);
-                        break;
-                    case '13':
-                        map.setView([25.123169, 56.326874], 11);
-                        break;
-                    case '15':
-                        map.setView([25.565111, 55.553200], 11);
-                        break;
+                    case '2': map.setView([25.276987, 55.296249], 11); break;
+                    case '3': map.setView([24.453884, 54.377344], 11); break;
+                    case '12': map.setView([25.357290, 55.391109], 11); break;
+                    case '14': map.setView([25.411111, 55.435278], 11); break;
+                    case '11': map.setView([25.789097, 55.937594], 11); break;
+                    case '13': map.setView([25.123169, 56.326874], 11); break;
+                    case '15': map.setView([25.565111, 55.553200], 11); break;
                 }
                 city = parseInt(emirate);
                 loadMap();
             });
 
-                  setTimeout(function() {
-        const popup = document.getElementById('disclaimerPopup');
-        if (popup) popup.style.display = 'none';
-    }, 5000);
-        });</script></body></html>
+            setTimeout(() => {
+                const disc = document.getElementById('disclaimerNode');
+                if (disc) disc.style.display = 'none';
+            }, 8000);
+        });
+    </script>
+</body>
 
+</html>
