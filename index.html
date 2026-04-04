@@ -461,7 +461,11 @@
     </div>
 
     <div class="disclaimer" id="disclaimerNode">
-        Educational purposes only. Sample data.
+        Disclaimer:
+        This page is for educational and personal study only. It is not affiliated with or endorsed by Dubizzle or any
+        other platform. Do not use this project to access, scrape, or interact with third-party APIs or data sources
+        without proper authorization. Replace all sample or placeholder data with your own legally permitted sources
+        before using this in any real environment.
     </div>
 
     <!-- Leaflet Scripts -->
@@ -810,7 +814,7 @@
                 }]
             };
 
-            fetch("https://rental-map-proxy.mansoor-infos.workers.dev", {
+            fetch("https://rmi.mansoor-infos.workers.dev", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(queryPayload)
