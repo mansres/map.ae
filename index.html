@@ -412,15 +412,34 @@
             margin-top: 24px;
         }
 
-        /* ── Mobile Toggle Button ── */
-        #mobile-toggle {
+        /* ── Mobile-only elements (hidden on desktop) ── */
+        #mobile-toggle,
+        #panel-close-btn,
+        #panel-backdrop {
             display: none;
         }
 
-        /* ── Mobile / Tablet Responsive ── */
+        /* Backdrop overlay shown behind full-screen panel */
+        #panel-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.45);
+            z-index: 999;
+            opacity: 0;
+            transition: opacity 0.35s ease;
+        }
+
+        #panel-backdrop.visible {
+            display: block;
+            opacity: 1;
+        }
+
+        /* ─────────────────────────────────────────────────
+           MOBILE PORTRAIT  (phones/tablets up to 768px wide)
+        ───────────────────────────────────────────────── */
         @media (max-width: 768px) {
 
-            /* Show toggle FAB */
             #mobile-toggle {
                 display: flex;
                 align-items: center;
@@ -441,8 +460,15 @@
                 box-shadow: 0 4px 20px rgba(37, 99, 235, 0.45);
                 cursor: pointer;
                 gap: 8px;
-                transition: all 0.25s ease;
+                transition: all 0.3s ease;
                 white-space: nowrap;
+            }
+
+            /* Hide FAB when panel is open — close via header button */
+            .panel-open-state #mobile-toggle {
+                opacity: 0;
+                pointer-events: none;
+                transform: translateX(-50%) translateY(80px);
             }
 
             #mobile-toggle:active {
@@ -454,34 +480,59 @@
                 transition: transform 0.3s ease;
             }
 
-            /* Dashboard becomes a bottom sheet */
+            /* Close button inside the header (only visible when panel open) */
+            #panel-close-btn {
+                display: none;
+                align-items: center;
+                justify-content: center;
+                position: absolute;
+                top: 50%;
+                right: 16px;
+                transform: translateY(-50%);
+                width: 32px;
+                height: 32px;
+                border-radius: 50%;
+                border: none;
+                background: var(--border-color);
+                color: var(--text-primary);
+                font-size: 18px;
+                font-weight: 700;
+                line-height: 1;
+                cursor: pointer;
+                z-index: 10;
+                font-family: inherit;
+            }
+
+            .panel-open-state #panel-close-btn {
+                display: flex;
+            }
+
+            /* Dashboard → full-screen bottom sheet */
             .dashboard {
-                /* Reset desktop positioning */
                 top: auto;
                 left: 0;
                 right: 0;
                 width: 100%;
                 max-width: 100%;
                 border-radius: 20px 20px 0 0;
-
-                /* Anchor to bottom */
                 bottom: 0;
                 position: fixed;
-
-                /* Collapsed: only header visible */
                 max-height: 72px;
                 overflow: hidden;
-                transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+                transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                    border-radius 0.4s ease;
             }
 
             .dashboard.panel-open {
-                max-height: 75vh;
+                max-height: 100dvh;
+                max-height: 100vh;
+                /* fallback */
+                border-radius: 0;
                 overflow: hidden;
             }
 
             .dashboard-header {
                 padding: 16px 20px 12px;
-                /* Drag handle visual */
                 position: relative;
             }
 
@@ -500,57 +551,164 @@
             }
 
             .dashboard-content {
-                padding: 0 20px 100px;
-                /* bottom padding clears FAB */
+                padding: 0 20px 32px;
                 overflow-y: auto;
-                max-height: calc(75vh - 72px);
+                max-height: calc(100dvh - 80px);
+                max-height: calc(100vh - 80px);
+                /* fallback */
                 -webkit-overflow-scrolling: touch;
             }
 
-            /* Leaflet controls: push down so they don't collide with header */
             .leaflet-top.leaflet-right {
                 top: 12px;
             }
 
-            /* Popup: full width on small screens */
             .leaflet-popup-content {
                 width: calc(100vw - 48px) !important;
                 max-width: 320px !important;
             }
 
-            /* Disclaimer always hidden on mobile (JS hides it anyway) */
             .disclaimer {
                 display: none !important;
             }
         }
 
-        /* Small phones */
-        @media (max-width: 400px) {
-            .dashboard.panel-open {
-                max-height: 80vh;
-            }
-        }
+        /* ─────────────────────────────────────────────────
+           MOBILE LANDSCAPE — detected by SHORT HEIGHT (≤500px)
+           NOTE: phones rotated sideways are often 844-932px WIDE,
+           so max-width:768px would NEVER fire. max-height:500px
+           reliably catches any phone held landscape.
+        ───────────────────────────────────────────────── */
+        @media (max-height: 500px) and (orientation: landscape) {
 
-        /* Landscape: keep panel compact so map is still usable */
-        @media (max-width: 768px) and (orientation: landscape) {
+            /* Show the FAB */
+            #mobile-toggle {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                position: fixed;
+                bottom: 10px;
+                left: 50%;
+                transform: translateX(-50%);
+                z-index: 1100;
+                background: var(--primary-color);
+                color: #fff;
+                border: none;
+                border-radius: 50px;
+                padding: 8px 18px;
+                font-size: 13px;
+                font-weight: 600;
+                font-family: inherit;
+                box-shadow: 0 4px 20px rgba(37, 99, 235, 0.45);
+                cursor: pointer;
+                gap: 6px;
+                transition: all 0.3s ease;
+                white-space: nowrap;
+            }
+
+            .panel-open-state #mobile-toggle {
+                opacity: 0;
+                pointer-events: none;
+                transform: translateX(-50%) translateY(60px);
+            }
+
+            #mobile-toggle:active {
+                transform: translateX(-50%) scale(0.96);
+            }
+
+            #mobile-toggle .toggle-icon {
+                font-size: 14px;
+                transition: transform 0.3s ease;
+            }
+
+            /* Close button visible when panel open */
+            #panel-close-btn {
+                display: none;
+                align-items: center;
+                justify-content: center;
+                position: absolute;
+                top: 50%;
+                right: 16px;
+                transform: translateY(-50%);
+                width: 28px;
+                height: 28px;
+                border-radius: 50%;
+                border: none;
+                background: var(--border-color);
+                color: var(--text-primary);
+                font-size: 16px;
+                font-weight: 700;
+                line-height: 1;
+                cursor: pointer;
+                z-index: 10;
+                font-family: inherit;
+            }
+
+            .panel-open-state #panel-close-btn {
+                display: flex;
+            }
+
+            /* Full-screen panel in landscape too */
             .dashboard {
-                max-height: 56px;
-                /* collapsed — just the handle + title row */
+                top: auto !important;
+                left: 0 !important;
+                right: 0 !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                border-radius: 20px 20px 0 0 !important;
+                bottom: 0 !important;
+                position: fixed !important;
+                max-height: 52px !important;
+                overflow: hidden !important;
+                transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important,
+                    border-radius 0.4s ease !important;
             }
 
             .dashboard.panel-open {
-                max-height: 55vh;
-                /* never more than half the short landscape height */
+                max-height: 100dvh !important;
+                max-height: 100vh !important;
+                border-radius: 0 !important;
+                overflow: hidden !important;
+            }
+
+            .dashboard-header {
+                padding: 10px 20px 8px;
+                position: relative;
+            }
+
+            .dashboard-header::before {
+                content: '';
+                display: block;
+                width: 32px;
+                height: 3px;
+                background: var(--border-color);
+                border-radius: 2px;
+                margin: 0 auto 8px;
+            }
+
+            .dashboard-header h1 {
+                font-size: 15px;
+            }
+
+            .dashboard-header p {
+                display: none;
             }
 
             .dashboard-content {
-                max-height: calc(55vh - 56px);
+                padding: 0 16px 32px;
+                overflow-y: auto;
+                max-height: calc(100dvh - 60px);
+                max-height: calc(100vh - 60px);
+                -webkit-overflow-scrolling: touch;
             }
 
-            #mobile-toggle {
-                bottom: 12px;
-                padding: 8px 18px;
-                font-size: 13px;
+            .leaflet-popup-content {
+                width: calc(100vw - 48px) !important;
+                max-width: 320px !important;
+            }
+
+            .disclaimer {
+                display: none !important;
             }
         }
     </style>
@@ -565,6 +723,9 @@
 
     <div id="map"></div>
 
+    <!-- Backdrop for full-screen filter panel -->
+    <div id="panel-backdrop"></div>
+
     <!-- Mobile toggle FAB -->
     <button id="mobile-toggle" aria-label="Toggle filters panel">
         <span class="toggle-icon">⚙️</span>
@@ -575,6 +736,7 @@
         <div class="dashboard-header" id="dashboard-header">
             <h1>Rental Radar</h1>
             <p>Real-time residency map</p>
+            <button id="panel-close-btn" aria-label="Close filters">&times;</button>
         </div>
         <div class="dashboard-content">
             <div class="form-group">
@@ -933,6 +1095,16 @@
                     return `<div class="popup-inner">${popupContent || '<div class="popup-list-item">No matching properties.</div>'}</div>`;
                 });
 
+                /* Explicit touch handler — Leaflet's built-in tap simulation
+                   can miss quick taps on divIcon markers on mobile browsers.
+                   touchend fires immediately on finger-lift and guarantees
+                   the popup opens without triggering a double-tap zoom. */
+                marker.on('touchend', function (e) {
+                    L.DomEvent.stopPropagation(e);
+                    L.DomEvent.preventDefault(e);
+                    this.openPopup();
+                });
+
                 markers.push(marker);
                 marker.addTo(map);
             });
@@ -1011,46 +1183,50 @@
                 if (disc) disc.style.display = 'none';
             }, 8000);
 
-            /* ── Mobile bottom-sheet toggle ── */
+            /* ── Mobile full-screen filter panel ── */
             const dashboard = document.getElementById('dashboard');
+            const backdrop = document.getElementById('panel-backdrop');
             const toggleBtn = document.getElementById('mobile-toggle');
-            const toggleLabel = document.getElementById('toggle-label');
-            const toggleIcon = toggleBtn.querySelector('.toggle-icon');
+            const closeBtn = document.getElementById('panel-close-btn');
 
-            function isMobile() {
-                return window.matchMedia('(max-width: 768px)').matches;
+            function isMobileOrLandscape() {
+                return window.matchMedia('(max-width: 768px)').matches ||
+                    window.matchMedia('(max-height: 500px) and (orientation: landscape)').matches;
             }
 
             function openPanel() {
                 dashboard.classList.add('panel-open');
-                toggleLabel.textContent = 'Close';
-                toggleIcon.style.transform = 'rotate(45deg)';
+                document.body.classList.add('panel-open-state');
+                // Fade-in backdrop: set display first, then opacity via class
+                backdrop.style.display = 'block';
+                requestAnimationFrame(() => backdrop.classList.add('visible'));
             }
 
             function closePanel() {
                 dashboard.classList.remove('panel-open');
-                toggleLabel.textContent = 'Filters';
-                toggleIcon.style.transform = 'rotate(0deg)';
+                document.body.classList.remove('panel-open-state');
+                backdrop.classList.remove('visible');
+                // Hide backdrop after fade-out transition (350ms)
+                setTimeout(() => { backdrop.style.display = 'none'; }, 360);
             }
 
+            // Open/close via FAB
             toggleBtn.addEventListener('click', () => {
-                if (dashboard.classList.contains('panel-open')) {
-                    closePanel();
-                } else {
-                    openPanel();
-                }
+                dashboard.classList.contains('panel-open') ? closePanel() : openPanel();
             });
 
-            /* Tap the drag handle / header to collapse on mobile */
-            document.getElementById('dashboard-header').addEventListener('click', () => {
-                if (isMobile() && dashboard.classList.contains('panel-open')) {
-                    closePanel();
-                }
+            // Close via × button in header
+            closeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                closePanel();
             });
+
+            // Close by tapping the dark backdrop
+            backdrop.addEventListener('click', closePanel);
 
             /* Close panel when a Leaflet popup opens (user tapped a marker) */
             map.on('popupopen', () => {
-                if (isMobile()) closePanel();
+                if (isMobileOrLandscape()) closePanel();
             });
         });
     </script>
