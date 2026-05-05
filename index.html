@@ -411,6 +411,148 @@
         .leaflet-top .leaflet-control {
             margin-top: 24px;
         }
+
+        /* ── Mobile Toggle Button ── */
+        #mobile-toggle {
+            display: none;
+        }
+
+        /* ── Mobile / Tablet Responsive ── */
+        @media (max-width: 768px) {
+
+            /* Show toggle FAB */
+            #mobile-toggle {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                position: fixed;
+                bottom: 24px;
+                left: 50%;
+                transform: translateX(-50%);
+                z-index: 1100;
+                background: var(--primary-color);
+                color: #fff;
+                border: none;
+                border-radius: 50px;
+                padding: 12px 24px;
+                font-size: 14px;
+                font-weight: 600;
+                font-family: inherit;
+                box-shadow: 0 4px 20px rgba(37, 99, 235, 0.45);
+                cursor: pointer;
+                gap: 8px;
+                transition: all 0.25s ease;
+                white-space: nowrap;
+            }
+
+            #mobile-toggle:active {
+                transform: translateX(-50%) scale(0.96);
+            }
+
+            #mobile-toggle .toggle-icon {
+                font-size: 16px;
+                transition: transform 0.3s ease;
+            }
+
+            /* Dashboard becomes a bottom sheet */
+            .dashboard {
+                /* Reset desktop positioning */
+                top: auto;
+                left: 0;
+                right: 0;
+                width: 100%;
+                max-width: 100%;
+                border-radius: 20px 20px 0 0;
+
+                /* Anchor to bottom */
+                bottom: 0;
+                position: fixed;
+
+                /* Collapsed: only header visible */
+                max-height: 72px;
+                overflow: hidden;
+                transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+
+            .dashboard.panel-open {
+                max-height: 75vh;
+                overflow: hidden;
+            }
+
+            .dashboard-header {
+                padding: 16px 20px 12px;
+                /* Drag handle visual */
+                position: relative;
+            }
+
+            .dashboard-header::before {
+                content: '';
+                display: block;
+                width: 36px;
+                height: 4px;
+                background: var(--border-color);
+                border-radius: 2px;
+                margin: 0 auto 12px;
+            }
+
+            .dashboard-header h1 {
+                font-size: 17px;
+            }
+
+            .dashboard-content {
+                padding: 0 20px 100px;
+                /* bottom padding clears FAB */
+                overflow-y: auto;
+                max-height: calc(75vh - 72px);
+                -webkit-overflow-scrolling: touch;
+            }
+
+            /* Leaflet controls: push down so they don't collide with header */
+            .leaflet-top.leaflet-right {
+                top: 12px;
+            }
+
+            /* Popup: full width on small screens */
+            .leaflet-popup-content {
+                width: calc(100vw - 48px) !important;
+                max-width: 320px !important;
+            }
+
+            /* Disclaimer always hidden on mobile (JS hides it anyway) */
+            .disclaimer {
+                display: none !important;
+            }
+        }
+
+        /* Small phones */
+        @media (max-width: 400px) {
+            .dashboard.panel-open {
+                max-height: 80vh;
+            }
+        }
+
+        /* Landscape: keep panel compact so map is still usable */
+        @media (max-width: 768px) and (orientation: landscape) {
+            .dashboard {
+                max-height: 56px;
+                /* collapsed — just the handle + title row */
+            }
+
+            .dashboard.panel-open {
+                max-height: 55vh;
+                /* never more than half the short landscape height */
+            }
+
+            .dashboard-content {
+                max-height: calc(55vh - 56px);
+            }
+
+            #mobile-toggle {
+                bottom: 12px;
+                padding: 8px 18px;
+                font-size: 13px;
+            }
+        }
     </style>
 </head>
 
@@ -423,8 +565,14 @@
 
     <div id="map"></div>
 
-    <div class="dashboard">
-        <div class="dashboard-header">
+    <!-- Mobile toggle FAB -->
+    <button id="mobile-toggle" aria-label="Toggle filters panel">
+        <span class="toggle-icon">⚙️</span>
+        <span id="toggle-label">Filters</span>
+    </button>
+
+    <div class="dashboard" id="dashboard">
+        <div class="dashboard-header" id="dashboard-header">
             <h1>Rental Radar</h1>
             <p>Real-time residency map</p>
         </div>
@@ -862,6 +1010,48 @@
                 const disc = document.getElementById('disclaimerNode');
                 if (disc) disc.style.display = 'none';
             }, 8000);
+
+            /* ── Mobile bottom-sheet toggle ── */
+            const dashboard = document.getElementById('dashboard');
+            const toggleBtn = document.getElementById('mobile-toggle');
+            const toggleLabel = document.getElementById('toggle-label');
+            const toggleIcon = toggleBtn.querySelector('.toggle-icon');
+
+            function isMobile() {
+                return window.matchMedia('(max-width: 768px)').matches;
+            }
+
+            function openPanel() {
+                dashboard.classList.add('panel-open');
+                toggleLabel.textContent = 'Close';
+                toggleIcon.style.transform = 'rotate(45deg)';
+            }
+
+            function closePanel() {
+                dashboard.classList.remove('panel-open');
+                toggleLabel.textContent = 'Filters';
+                toggleIcon.style.transform = 'rotate(0deg)';
+            }
+
+            toggleBtn.addEventListener('click', () => {
+                if (dashboard.classList.contains('panel-open')) {
+                    closePanel();
+                } else {
+                    openPanel();
+                }
+            });
+
+            /* Tap the drag handle / header to collapse on mobile */
+            document.getElementById('dashboard-header').addEventListener('click', () => {
+                if (isMobile() && dashboard.classList.contains('panel-open')) {
+                    closePanel();
+                }
+            });
+
+            /* Close panel when a Leaflet popup opens (user tapped a marker) */
+            map.on('popupopen', () => {
+                if (isMobile()) closePanel();
+            });
         });
     </script>
 </body>
