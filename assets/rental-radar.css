@@ -349,159 +349,28 @@ img {
   font-weight: 750;
 }
 
-/* Summary metrics and the price distribution --------------------------------------- */
-
-#summary-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  flex: 0 0 auto;
-  padding: 14px 16px 0;
-}
-
-#summary-grid > *,
-.summary-card {
-  min-width: 0;
-  min-height: 76px;
-  padding: 11px 12px;
-  border: 1px solid var(--rr-line);
-  border-radius: var(--rr-radius-sm);
-  background: var(--rr-surface);
-  box-shadow: 0 1px 1px rgb(23 32 51 / 2%);
-}
-
-.summary-label,
-#summary-grid small {
-  display: block;
-  overflow: hidden;
-  color: var(--rr-muted);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: .045em;
-  line-height: 1.25;
-  text-overflow: ellipsis;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.summary-value,
-#summary-grid strong,
-#summary-grid b {
-  display: block;
-  overflow: hidden;
-  margin-top: 5px;
-  color: var(--rr-ink);
-  font-size: 18px;
-  font-variant-numeric: tabular-nums;
-  font-weight: 760;
-  letter-spacing: -.035em;
-  line-height: 1.05;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-#summary-median .summary-value,
-#summary-median strong,
-#summary-median b {
-  font-size: 16px;
-}
-
-#load-progress .summary-value,
-#load-progress strong,
-#load-progress b {
-  color: var(--rr-primary);
-}
-
+/* Legacy data hooks may remain in the document, but are not part of the workspace. */
+#summary-grid,
 #price-distribution {
-  flex: 0 0 auto;
-  margin: 14px 16px 0;
-  padding: 12px;
-  border: 1px solid var(--rr-line);
-  border-radius: var(--rr-radius-sm);
-  background: var(--rr-surface-subtle);
-}
-
-#price-distribution > h2,
-#price-distribution > h3,
-#price-distribution > header,
-.distribution-title {
-  margin: 0 0 9px;
-  color: var(--rr-ink);
-  font-size: 12px;
-  font-weight: 750;
-  letter-spacing: -.01em;
-}
-
-.distribution-list {
-  display: grid;
-  gap: 7px;
-}
-
-.distribution-row,
-.distribution-item {
-  display: grid;
-  grid-template-columns: minmax(52px, auto) minmax(34px, 1fr) auto;
-  align-items: center;
-  gap: 7px;
-  min-width: 0;
-  color: var(--rr-muted);
-  font-size: 10px;
-  font-variant-numeric: tabular-nums;
-}
-
-.distribution-label {
-  overflow: hidden;
-  font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.distribution-track {
-  height: 7px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: #e3eaf3;
-}
-
-.distribution-fill {
-  display: block;
-  width: var(--distribution-width, 0%);
-  min-width: var(--distribution-min-width, 0);
-  height: 100%;
-  border-radius: inherit;
-  background: var(--band-color, var(--rr-primary));
-}
-
-.distribution-count {
-  min-width: 2ch;
-  color: var(--rr-ink);
-  font-weight: 750;
-  text-align: right;
+  display: none !important;
 }
 
 /* Filter controls ------------------------------------------------------------------ */
 
 #filter-panel {
-  display: flex;
-  min-height: 0;
-  flex: 0 1 auto;
-  flex-direction: column;
-  gap: 12px;
-  overflow: auto;
-  margin: 14px 0 0;
-  padding: 0 16px 14px;
-  overscroll-behavior: contain;
-  scrollbar-color: #c5d1df transparent;
-  scrollbar-width: thin;
+  display: grid;
+  flex: 0 0 auto;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 9px;
+  margin: 10px 0 0;
+  padding: 0 16px 10px;
 }
 
-#filter-panel::-webkit-scrollbar,
 #results-list::-webkit-scrollbar,
 .mobile-sheet .sheet-content::-webkit-scrollbar {
   width: 8px;
 }
 
-#filter-panel::-webkit-scrollbar-thumb,
 #results-list::-webkit-scrollbar-thumb,
 .mobile-sheet .sheet-content::-webkit-scrollbar-thumb {
   border: 2px solid transparent;
@@ -511,6 +380,8 @@ img {
 }
 
 .filter-group {
+  display: grid;
+  gap: 6px;
   min-width: 0;
   margin: 0;
   padding: 0;
@@ -524,7 +395,7 @@ img {
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  margin: 0 0 8px;
+  margin: 0;
   padding: 0;
   color: var(--rr-ink);
   font-size: 12px;
@@ -535,14 +406,14 @@ img {
 .filter-group select,
 .select-control {
   width: 100%;
-  min-height: 44px;
-  padding: 10px 38px 10px 12px;
+  min-height: 40px;
+  padding: 8px 34px 8px 10px;
   appearance: none;
   border: 1px solid var(--rr-line-strong);
   border-radius: 10px;
   outline: none;
-  background: var(--rr-surface) linear-gradient(45deg, transparent 50%, var(--rr-muted) 50%) calc(100% - 17px) 19px / 5px 5px no-repeat,
-    linear-gradient(135deg, var(--rr-muted) 50%, transparent 50%) calc(100% - 12px) 19px / 5px 5px no-repeat;
+  background: var(--rr-surface) linear-gradient(45deg, transparent 50%, var(--rr-muted) 50%) calc(100% - 16px) 17px / 5px 5px no-repeat,
+    linear-gradient(135deg, var(--rr-muted) 50%, transparent 50%) calc(100% - 11px) 17px / 5px 5px no-repeat;
   box-shadow: inset 0 1px 1px rgb(23 32 51 / 2%);
   transition: border-color .16s ease, box-shadow .16s ease;
 }
@@ -565,6 +436,40 @@ img {
   gap: 5px;
 }
 
+/* Budget is intentionally one compact, readable range rather than many price chips. */
+#price-range-filters,
+.price-range-filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+#price-range-filters > label,
+.price-range-filters > label,
+.price-range-control {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+  color: var(--rr-muted);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: .025em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+#minimum-price,
+#maximum-price {
+  min-width: 0;
+  min-height: 38px;
+  padding: 7px 30px 7px 9px;
+  font-size: 11px;
+  font-weight: 680;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
 .filter-actions button,
 .filter-controls button,
 .text-button {
@@ -584,13 +489,21 @@ img {
   background: var(--rr-primary-soft);
 }
 
-#price-filters,
-#type-filters,
 #bedroom-filters,
 .filter-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 7px;
+}
+
+/* Legacy facets remain available to the script but are not shown in the compact UI. */
+.price-band-group,
+.property-type-group,
+.filter-group:has(#price-filters),
+.filter-group:has(#type-filters),
+#price-filters,
+#type-filters {
+  display: none !important;
 }
 
 .filter-chip {
@@ -689,7 +602,7 @@ img {
   background: rgb(29 78 216 / 13%);
 }
 
-/* Ordered palette can be applied to chips, distribution rows, and marker icons. */
+/* Ordered palette is retained for price-aware map balloons. */
 .price-band-0,
 [data-band="0"] { --band-color: var(--rr-price-0); --band-soft: var(--rr-price-0-soft); }
 .price-band-1,
@@ -758,8 +671,9 @@ img {
 
 #reset-filters,
 .secondary-button {
-  min-height: 38px;
-  padding: 8px 11px;
+  min-height: 36px;
+  justify-self: start;
+  padding: 7px 10px;
   border: 1px solid var(--rr-line-strong);
   border-radius: 9px;
   background: var(--rr-surface);
@@ -785,8 +699,8 @@ img {
 
 #results-panel {
   display: flex;
-  min-height: 175px;
-  flex: 1 1 240px;
+  min-height: 0;
+  flex: 1 1 auto;
   flex-direction: column;
   overflow: hidden;
   border-top: 1px solid var(--rr-line);
@@ -1607,23 +1521,18 @@ img {
 
 #filter-sheet #filter-panel,
 #filter-sheet .filter-panel {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   flex: 0 0 auto;
   overflow: visible;
   margin: 0;
   padding: 0;
 }
 
-#filter-sheet #summary-grid,
-#filter-sheet #price-distribution,
 #filter-sheet #active-filters,
 #filter-sheet #app-status {
   margin-right: 0;
   margin-left: 0;
-}
-
-#filter-sheet #summary-grid {
-  padding: 0;
 }
 
 #results-sheet .sheet-content,
@@ -1788,22 +1697,6 @@ img {
   .mobile-sheet {
     max-height: 86dvh;
     min-height: min(350px, 68dvh);
-  }
-
-  #summary-grid {
-    gap: 7px;
-  }
-
-  #summary-grid > *,
-  .summary-card {
-    min-height: 70px;
-    padding: 10px;
-  }
-
-  .summary-value,
-  #summary-grid strong,
-  #summary-grid b {
-    font-size: 16px;
   }
 
   .result-card {

@@ -32,7 +32,8 @@ test('the supplied 1,000-listing fixture keeps map groups and filters in sync', 
 
     const allPropertyTypes = new Set(listings.map((listing) => listing.propertyType).filter(Boolean));
     const filters = {
-        priceBands: new Set([4]),
+        minimumPrice: 50001,
+        maximumPrice: 60000,
         propertyTypes: allPropertyTypes,
         bedrooms: new Set([1])
     };

@@ -73,7 +73,19 @@
                         <select id="city-select" class="select-control"></select>
                     </fieldset>
 
-                    <fieldset class="filter-group">
+                    <fieldset class="filter-group price-range-group">
+                        <legend>Price range (AED)</legend>
+                        <div id="price-range-filters" class="price-range-controls">
+                            <label for="minimum-price">Min
+                                <select id="minimum-price" class="select-control" aria-label="Minimum price"></select>
+                            </label>
+                            <label for="maximum-price">Max
+                                <select id="maximum-price" class="select-control" aria-label="Maximum price"></select>
+                            </label>
+                        </div>
+                    </fieldset>
+
+                    <fieldset class="filter-group price-band-group" aria-hidden="true">
                         <legend>
                             <span>Price bands</span>
                             <span id="price-actions" class="filter-actions"></span>
@@ -81,7 +93,7 @@
                         <div id="price-filters" class="filter-chips" aria-label="Price band filters"></div>
                     </fieldset>
 
-                    <fieldset class="filter-group">
+                    <fieldset class="filter-group property-type-group" aria-hidden="true">
                         <legend>
                             <span>Property type</span>
                             <span id="type-actions" class="filter-actions"></span>

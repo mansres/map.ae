@@ -15,6 +15,10 @@ const SEARCH_INDEX = 'property-for-rent-residential.com';
 const PAGE_CONCURRENCY = 3;
 const INITIAL_RESULT_LIMIT = 40;
 const SOURCE_PRICE_LIMITS = Object.freeze({ minimum: 10000, maximum: 80000 });
+const PRICE_RANGE_OPTIONS = Object.freeze([
+    10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000,
+    100000, 150000, 200000, 300000, 500000, 1000000
+]);
 
 const CITIES = Object.freeze([
     { id: '0', label: 'All Emirates', center: [24.840, 55.460], zoom: 8 },
@@ -47,6 +51,8 @@ const state = {
     listings: [],
     seenIds: new Set(),
     priceBands: new Set(PRICE_BANDS.map((_, index) => index)),
+    minimumPrice: null,
+    maximumPrice: null,
     propertyTypes: new Set(),
     bedrooms: new Set(),
     propertyTypesTouched: false,
@@ -105,6 +111,8 @@ function bootstrap() {
         priceFilters: requiredElement('price-filters'),
         typeFilters: requiredElement('type-filters'),
         bedroomFilters: requiredElement('bedroom-filters'),
+        minimumPrice: requiredElement('minimum-price'),
+        maximumPrice: requiredElement('maximum-price'),
         priceActions: requiredElement('price-actions'),
         typeActions: requiredElement('type-actions'),
         bedroomActions: requiredElement('bedroom-actions'),
@@ -221,6 +229,8 @@ function populateCities() {
 
 function wireEvents() {
     ui.citySelect.addEventListener('change', () => loadCity(ui.citySelect.value));
+    ui.minimumPrice.addEventListener('change', () => onPriceRangeChange('minimum'));
+    ui.maximumPrice.addEventListener('change', () => onPriceRangeChange('maximum'));
     ui.refreshData.addEventListener('click', () => loadCity(state.cityId));
     ui.resetFilters.addEventListener('click', resetFilters);
     ui.filterPanel.addEventListener('click', onFilterPanelClick);
@@ -404,6 +414,8 @@ function isAbortError(error) {
 function resetFilters(options = {}) {
     const facets = facetValues(state.listings);
     state.priceBands = new Set(PRICE_BANDS.map((_, index) => index));
+    state.minimumPrice = null;
+    state.maximumPrice = null;
     state.propertyTypes = new Set(facets.propertyTypes.map((facet) => facet.value));
     state.bedrooms = new Set(facets.bedrooms.map((facet) => facet.value));
     state.propertyTypesTouched = false;
@@ -425,6 +437,8 @@ function scheduleRender(focusRequest = null) {
 function currentFilters() {
     return {
         priceBands: state.priceBands,
+        minimumPrice: state.minimumPrice,
+        maximumPrice: state.maximumPrice,
         propertyTypes: state.propertyTypes,
         bedrooms: state.bedrooms
     };
@@ -555,6 +569,7 @@ function renderDistribution() {
 
 function renderFilters() {
     const facets = facetValues(state.listings);
+    renderPriceRangeControls();
     renderFacetActions(ui.priceActions, 'price', PRICE_BANDS.map((_, index) => index), state.priceBands);
     renderFacetActions(ui.typeActions, 'type', facets.propertyTypes.map((facet) => facet.value), state.propertyTypes);
     renderFacetActions(ui.bedroomActions, 'bedroom', facets.bedrooms.map((facet) => facet.value), state.bedrooms);
@@ -589,6 +604,52 @@ function renderFilters() {
         ));
     }
     ui.bedroomFilters.replaceChildren(bedroomChips);
+}
+
+function renderPriceRangeControls() {
+    populatePriceRangeSelect(ui.minimumPrice, 'Any minimum', state.minimumPrice);
+    populatePriceRangeSelect(ui.maximumPrice, 'Any maximum', state.maximumPrice);
+}
+
+function populatePriceRangeSelect(select, placeholder, selectedValue) {
+    const fragment = document.createDocumentFragment();
+    const any = document.createElement('option');
+    any.value = '';
+    any.textContent = placeholder;
+    fragment.append(any);
+    for (const price of PRICE_RANGE_OPTIONS) {
+        const option = document.createElement('option');
+        option.value = String(price);
+        option.textContent = formatCompactPrice(price);
+        fragment.append(option);
+    }
+    select.replaceChildren(fragment);
+    select.value = selectedValue === null ? '' : String(selectedValue);
+}
+
+function onPriceRangeChange(changedBound) {
+    const minimum = selectedPrice(ui.minimumPrice.value);
+    const maximum = selectedPrice(ui.maximumPrice.value);
+    state.minimumPrice = minimum;
+    state.maximumPrice = maximum;
+
+    if (minimum !== null && maximum !== null && minimum > maximum) {
+        if (changedBound === 'minimum') {
+            state.maximumPrice = minimum;
+        } else {
+            state.minimumPrice = maximum;
+        }
+    }
+
+    state.selectedGroupKey = null;
+    state.resultsLimit = INITIAL_RESULT_LIMIT;
+    scheduleRender(changedBound === 'minimum' ? 'price-minimum' : 'price-maximum');
+}
+
+function selectedPrice(value) {
+    if (value === null || value === undefined || value === '') return null;
+    const number = Number(value);
+    return Number.isFinite(number) && number >= 0 ? number : null;
 }
 
 function renderFacetActions(container, kind, values, selected) {
@@ -637,6 +698,8 @@ function countFacetValue(kind, value) {
     const base = currentFilters();
     const filters = {
         priceBands: kind === 'price' ? undefined : base.priceBands,
+        minimumPrice: base.minimumPrice,
+        maximumPrice: base.maximumPrice,
         propertyTypes: kind === 'type' ? undefined : base.propertyTypes,
         bedrooms: kind === 'bedroom' ? undefined : base.bedrooms
     };
@@ -701,10 +764,22 @@ function replaceSet(target, values) {
 function renderActiveFilters() {
     const fragment = document.createDocumentFragment();
     const facets = facetValues(state.listings);
-    appendActiveFacetChips(fragment, 'price', PRICE_BANDS.map((band) => band.label), PRICE_BANDS.map((_, index) => index), state.priceBands);
-    appendActiveFacetChips(fragment, 'type', facets.propertyTypes.map((facet) => facet.value), facets.propertyTypes.map((facet) => facet.value), state.propertyTypes);
+    appendActivePriceRange(fragment);
     appendActiveFacetChips(fragment, 'bedroom', facets.bedrooms.map((facet) => bedroomLabel(facet.value)), facets.bedrooms.map((facet) => facet.value), state.bedrooms);
     ui.activeFilters.replaceChildren(fragment);
+}
+
+function appendActivePriceRange(container) {
+    if (state.minimumPrice === null && state.maximumPrice === null) return;
+    let label = 'Price: ';
+    if (state.minimumPrice !== null && state.maximumPrice !== null) {
+        label += formatCompactPrice(state.minimumPrice) + '–' + formatCompactPrice(state.maximumPrice).replace('AED ', '');
+    } else if (state.minimumPrice !== null) {
+        label += 'from ' + formatCompactPrice(state.minimumPrice);
+    } else {
+        label += 'up to ' + formatCompactPrice(state.maximumPrice);
+    }
+    container.append(createActiveChip('price-range', label, '', 'restore'));
 }
 
 function appendActiveFacetChips(container, kind, labels, values, selected) {
@@ -740,6 +815,14 @@ function onActiveFilterClick(event) {
     if (!button) return;
     const kind = button.dataset.activeKind;
     const action = button.dataset.activeAction;
+    if (kind === 'price-range') {
+        state.minimumPrice = null;
+        state.maximumPrice = null;
+        state.selectedGroupKey = null;
+        state.resultsLimit = INITIAL_RESULT_LIMIT;
+        scheduleRender();
+        return;
+    }
     const selection = selectionForKind(kind);
     if (!selection) return;
 
@@ -880,7 +963,7 @@ function createListingRow(listing) {
     const meta = [];
     if (listing.propertyType) meta.push(listing.propertyType);
     if (listing.bedrooms !== null) meta.push(bedroomLabel(listing.bedrooms));
-    if (listing.size) meta.push(formatCount(Math.round(listing.size)) + ' sqft');
+    if (listing.size !== null && listing.size !== undefined) meta.push('Size: ' + formatSize(listing.size));
     if (meta.length) details.append(element('div', 'listing-row-meta', meta.join(' · ')));
     row.append(details);
 
@@ -986,7 +1069,7 @@ function createPopup(group) {
         const meta = [];
         if (listing.propertyType) meta.push(listing.propertyType);
         if (listing.bedrooms !== null) meta.push(bedroomLabel(listing.bedrooms));
-        if (listing.size) meta.push(formatCount(Math.round(listing.size)) + ' sqft');
+        if (listing.size !== null && listing.size !== undefined) meta.push('Size: ' + formatSize(listing.size));
         if (meta.length) details.append(element('div', 'popup-listing-meta', meta.join(' · ')));
         if (listing.listingUrl) {
             const link = element('a', 'popup-link', 'View listing');
@@ -1068,8 +1151,7 @@ function renderMobileToolbar() {
 function activeFilterCount() {
     const facets = facetValues(state.listings);
     let count = 0;
-    if (state.priceBands.size !== PRICE_BANDS.length) count += 1;
-    if (state.propertyTypes.size !== facets.propertyTypes.length) count += 1;
+    if (state.minimumPrice !== null || state.maximumPrice !== null) count += 1;
     if (state.bedrooms.size !== facets.bedrooms.length) count += 1;
     return count;
 }
@@ -1195,6 +1277,12 @@ function formatPrice(value) {
     return typeof value === 'number' && Number.isFinite(value)
         ? aedFormatter.format(value)
         : 'Price TBA';
+}
+
+function formatSize(value) {
+    return typeof value === 'number' && Number.isFinite(value)
+        ? formatCount(Math.round(value)) + ' sqft'
+        : 'Size unavailable';
 }
 
 function formatCompactPrice(value) {

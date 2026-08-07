@@ -95,7 +95,25 @@ test('priceBandIndex uses disjoint inclusive price bands', () => {
   assert.equal(priceBandIndex(55000), 4);
   assert.equal(priceBandIndex(70000), 5);
   assert.equal(priceBandIndex(70001), 6);
-  assert.equal(priceBandIndex(null), -1);
+    assert.equal(priceBandIndex(null), -1);
+});
+
+test('minimum and maximum price filters use an inclusive continuous range', () => {
+    const lower = normalizeListing(rawListing({ objectID: 'lower', price: 50000 }), 0);
+    const inside = normalizeListing(rawListing({ objectID: 'inside', price: 55000 }), 1);
+    const upper = normalizeListing(rawListing({ objectID: 'upper', price: 60000 }), 2);
+    const above = normalizeListing(rawListing({ objectID: 'above', price: 60001 }), 3);
+    const filters = {
+        minimumPrice: 50001,
+        maximumPrice: 60000,
+        propertyTypes: new Set(['Apartment']),
+        bedrooms: new Set([1])
+    };
+
+    assert.equal(matchesFilters(lower, filters), false);
+    assert.equal(matchesFilters(inside, filters), true);
+    assert.equal(matchesFilters(upper, filters), true);
+    assert.equal(matchesFilters(above, filters), false);
 });
 
 test('one filter predicate drives both matching and exact-coordinate grouping', () => {

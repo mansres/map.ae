@@ -251,6 +251,16 @@ function matchesSelection(value, selection) {
     return selection === null || selection.has(value);
 }
 
+function filterNumber(filters, names) {
+    if (!filters) return null;
+    for (const name of names) {
+        if (!Object.prototype.hasOwnProperty.call(filters, name)) continue;
+        const value = asFiniteNumber(filters[name]);
+        if (value !== null) return value;
+    }
+    return null;
+}
+
 /**
  * Missing filter sets mean unrestricted. An explicitly empty set means the
  * user cleared that facet and therefore nothing can match it.
@@ -260,11 +270,15 @@ export function matchesFilters(listing, filters = {}) {
     const bands = selectedSet(filters, 'priceBands');
     const types = selectedSet(filters, 'propertyTypes');
     const bedrooms = selectedSet(filters, 'bedrooms');
+    const minimumPrice = filterNumber(filters, ['minimumPrice', 'minPrice']);
+    const maximumPrice = filterNumber(filters, ['maximumPrice', 'maxPrice']);
 
     const band = priceBandIndex(listing.price);
     if (!matchesSelection(band, bands)) return false;
     if (!matchesSelection(listing.propertyType, types)) return false;
     if (!matchesSelection(listing.bedrooms, bedrooms)) return false;
+    if (minimumPrice !== null && (listing.price === null || listing.price < minimumPrice)) return false;
+    if (maximumPrice !== null && (listing.price === null || listing.price > maximumPrice)) return false;
     return true;
 }
 

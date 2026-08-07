@@ -2,7 +2,7 @@
 
 Rental Radar is a static, map-first rental browser. It groups listings at the
 same location, keeps the map and result cards in sync, and filters live by
-location, price band, property type, and bedrooms.
+location, a continuous price range, and bedrooms.
 
 ## Run locally
 
