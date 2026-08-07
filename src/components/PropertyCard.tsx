@@ -6,9 +6,11 @@ import type { RentalGroup } from '../types/rental';
 type PropertyCardProps = {
     group: RentalGroup;
     selected?: boolean;
+    hovered?: boolean;
     compact?: boolean;
     favorite?: boolean;
     onSelect: (key: string) => void;
+    onHover?: (key: string | null) => void;
     onToggleFavorite: (key: string) => void;
 };
 
@@ -31,7 +33,7 @@ function Meta({ children }: { children: ReactNode }) {
     return <span className="listing-meta">{children}</span>;
 }
 
-export function PropertyCard({ group, selected = false, compact = false, favorite = false, onSelect, onToggleFavorite }: PropertyCardProps) {
+export function PropertyCard({ group, selected = false, hovered = false, compact = false, favorite = false, onSelect, onHover, onToggleFavorite }: PropertyCardProps) {
     const listing = group.representative;
     const meta = [
         bedroomLabel(listing?.bedrooms),
@@ -41,7 +43,15 @@ export function PropertyCard({ group, selected = false, compact = false, favorit
     const title = group.neighborhood || listing?.title || 'Rental location';
 
     return (
-        <article className={`property-card${selected ? ' property-card--selected is-selected' : ''}${compact ? ' property-card--compact' : ''}`}>
+        <article
+            className={`property-card${selected ? ' property-card--selected is-selected' : ''}${hovered ? ' is-hovered' : ''}${compact ? ' property-card--compact' : ''}`}
+            onPointerEnter={() => onHover?.(group.key)}
+            onPointerLeave={() => onHover?.(null)}
+            onFocusCapture={() => onHover?.(group.key)}
+            onBlurCapture={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) onHover?.(null);
+            }}
+        >
             <button
                 type="button"
                 className="property-card__media"

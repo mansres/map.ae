@@ -6,8 +6,7 @@ import {
     extractSearchPage,
     groupVisibleListings,
     matchesFilters,
-    normalizeListing,
-    priceBandIndex
+    normalizeListing
 } from '../assets/rental-core.js';
 
 const fixturePath = process.env.RENTAL_FIXTURE;
@@ -40,9 +39,6 @@ test('the supplied 1,000-listing fixture keeps map groups and filters in sync', 
     const visible = listings.filter((listing) => matchesFilters(listing, filters));
     const groups = groupVisibleListings(listings, filters);
 
-    assert.equal(priceBandIndex(50000), 3);
-    assert.equal(priceBandIndex(50001), 4);
-    assert.equal(priceBandIndex(60000), 4);
     assert.equal(visible.length, 110);
     assert.equal(groups.length, 89);
     assert.equal(groups.reduce((total, group) => total + group.listings.length, 0), 110);

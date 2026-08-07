@@ -41,12 +41,25 @@ export interface RentalGroup {
     listings: readonly RentalListing[];
     count: number;
     lowestPrice: number | null;
-    priceBandIndex: number;
     propertyTypes: readonly string[];
     bedrooms: readonly number[];
     neighborhood: string | null;
     imageUrl: string | null;
     representative: RentalListing | null;
+}
+
+export interface RentalMapBounds {
+    north: number;
+    south: number;
+    east: number;
+    west: number;
+}
+
+export interface RentalPriceScaleBand {
+    index: number;
+    color: string;
+    minimum: number;
+    maximum: number;
 }
 
 export interface RentalFacet<TValue extends string | number> {

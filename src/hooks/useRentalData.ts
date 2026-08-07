@@ -25,7 +25,7 @@ export type City = RentalCity;
 const DEFAULT_ENDPOINT = 'https://rmi.mansoor-infos.workers.dev';
 const SEARCH_INDEX = 'property-for-rent-residential.com';
 const PAGE_CONCURRENCY = 3;
-const SOURCE_PRICE_LIMITS = Object.freeze({ minimum: 10_000, maximum: 80_000 });
+export const RENTAL_PRICE_LIMITS = Object.freeze({ minimum: 0, maximum: 1_000_000 });
 
 const RETRIEVED_ATTRIBUTES = Object.freeze([
     'id', 'objectID', 'uuid', 'name', 'property_reference', 'price', 'bedrooms', 'bathrooms',
@@ -287,7 +287,7 @@ function isAbortError(error: unknown) {
 export function buildRentalSearchPayload(cityId: string, page: number): RentalSearchRequestPayload {
     const filters = [
         '("categories_v2.slug_paths":"property-for-rent/residential")',
-        `(price:${SOURCE_PRICE_LIMITS.minimum} TO ${SOURCE_PRICE_LIMITS.maximum})`
+        `(price:${RENTAL_PRICE_LIMITS.minimum} TO ${RENTAL_PRICE_LIMITS.maximum})`
     ];
     if (cityId !== '0') filters.push(`("city.id"=${cityId})`);
 

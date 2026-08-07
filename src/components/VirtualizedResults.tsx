@@ -7,18 +7,22 @@ import { PropertyCard } from './PropertyCard';
 type VirtualizedResultsProps = {
     groups: readonly RentalGroup[];
     selectedGroupKey: string | null;
+    hoveredGroupKey?: string | null;
     favorites: ReadonlySet<string>;
     compact?: boolean;
     onSelect: (key: string) => void;
+    onHover?: (key: string | null) => void;
     onToggleFavorite: (key: string) => void;
 };
 
 export function VirtualizedResults({
     groups,
     selectedGroupKey,
+    hoveredGroupKey = null,
     favorites,
     compact = false,
     onSelect,
+    onHover,
     onToggleFavorite
 }: VirtualizedResultsProps) {
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -55,8 +59,10 @@ export function VirtualizedResults({
                                 group={group}
                                 compact={compact}
                                 selected={selectedGroupKey === group.key}
+                                hovered={hoveredGroupKey === group.key}
                                 favorite={favorites.has(group.key)}
                                 onSelect={onSelect}
+                                onHover={onHover}
                                 onToggleFavorite={onToggleFavorite}
                             />
                         </div>

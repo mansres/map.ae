@@ -2,12 +2,13 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  createPercentagePriceScale,
   extractHits,
   groupVisibleListings,
   isSafeHttpUrl,
   matchesFilters,
   normalizeListing,
-  priceBandIndex
+  percentagePriceBandIndex
 } from '../assets/rental-core.js';
 
 function rawListing(overrides = {}) {
@@ -87,15 +88,21 @@ test('only http and https URLs are accepted for external links', () => {
   assert.equal(isSafeHttpUrl(null), false);
 });
 
-test('priceBandIndex uses disjoint inclusive price bands', () => {
-  assert.equal(priceBandIndex(20000), 0);
-  assert.equal(priceBandIndex(20001), 1);
-  assert.equal(priceBandIndex(50000), 3);
-  assert.equal(priceBandIndex(50001), 4);
-  assert.equal(priceBandIndex(55000), 4);
-  assert.equal(priceBandIndex(70000), 5);
-  assert.equal(priceBandIndex(70001), 6);
-    assert.equal(priceBandIndex(null), -1);
+test('percentage price scale creates five live 20 percent intervals', () => {
+  const scale = createPercentagePriceScale(0, 100000);
+  assert.equal(scale.length, 5);
+  assert.deepEqual(scale.map((band) => [band.minimum, band.maximum]), [
+    [0, 20000],
+    [20000, 40000],
+    [40000, 60000],
+    [60000, 80000],
+    [80000, 100000]
+  ]);
+  assert.equal(percentagePriceBandIndex(20000, 0, 100000), 0);
+  assert.equal(percentagePriceBandIndex(20001, 0, 100000), 1);
+  assert.equal(percentagePriceBandIndex(100000, 0, 100000), 4);
+  assert.equal(percentagePriceBandIndex(250000, 0, 100000), 4);
+  assert.equal(percentagePriceBandIndex(null, 0, 100000), -1);
 });
 
 test('minimum and maximum price filters use an inclusive continuous range', () => {
@@ -134,7 +141,8 @@ test('one filter predicate drives both matching and exact-coordinate grouping', 
     }), 3)
   ];
   const filters = {
-    priceBands: new Set([4]),
+    minimumPrice: 50001,
+    maximumPrice: 60000,
     propertyTypes: new Set(['Apartment']),
     bedrooms: new Set([1])
   };
@@ -154,9 +162,8 @@ test('one filter predicate drives both matching and exact-coordinate grouping', 
 test('empty active facet sets produce no matches and no map groups', () => {
   const listing = normalizeListing(rawListing(), 0);
   const filters = {
-    priceBands: new Set(),
     propertyTypes: new Set(['Apartment']),
-    bedrooms: new Set([1])
+    bedrooms: new Set()
   };
 
   assert.equal(matchesFilters(listing, filters), false);

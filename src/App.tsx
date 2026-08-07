@@ -19,9 +19,11 @@ import {
 } from 'lucide-react';
 
 import { PropertyCard } from './components/PropertyCard';
+import { PriceRangeSlider } from './components/PriceRangeSlider';
 import { VirtualizedResults } from './components/VirtualizedResults';
-import { CITIES, useRentalData } from './hooks/useRentalData';
-import type { RentalFilters } from './types/rental';
+import { createPercentagePriceScale } from '../assets/rental-core.js';
+import { CITIES, RENTAL_PRICE_LIMITS, useRentalData } from './hooks/useRentalData';
+import type { RentalFilters, RentalGroup, RentalMapBounds, RentalPriceScaleBand } from './types/rental';
 
 type Popover = 'price' | 'beds' | 'type' | null;
 type SortOption = 'price-low' | 'price-high' | 'density';
@@ -69,6 +71,46 @@ function priceRangeLabel(minPrice: number | null, maxPrice: number | null) {
 
 function bedroomLabel(value: number) {
     return value === 0 ? 'Studio' : `${value} bed${value === 1 ? '' : 's'}`;
+}
+
+function boundsEqual(left: RentalMapBounds | null, right: RentalMapBounds | null) {
+    if (left === right) return true;
+    if (!left || !right) return false;
+    const tolerance = 0.00001;
+    return Math.abs(left.north - right.north) < tolerance
+        && Math.abs(left.south - right.south) < tolerance
+        && Math.abs(left.east - right.east) < tolerance
+        && Math.abs(left.west - right.west) < tolerance;
+}
+
+function groupInBounds(group: RentalGroup, bounds: RentalMapBounds | null) {
+    if (!bounds) return true;
+    const latitudeMatches = group.latitude >= bounds.south && group.latitude <= bounds.north;
+    const longitudeMatches = bounds.west <= bounds.east
+        ? group.longitude >= bounds.west && group.longitude <= bounds.east
+        : group.longitude >= bounds.west || group.longitude <= bounds.east;
+    return latitudeMatches && longitudeMatches;
+}
+
+function formatLegendPrice(value: number) {
+    if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(value % 1_000_000 ? 1 : 0)}M`;
+    return `${Math.round(value / 1_000)}K`;
+}
+
+function PriceLegend({ scale }: { scale: readonly RentalPriceScaleBand[] }) {
+    return (
+        <section className="price-legend" aria-label="Map marker price colors">
+            <strong>Price on map</strong>
+            <div className="price-legend__scale">
+                {scale.map((band) => (
+                    <span key={band.index} style={{ '--legend-color': band.color } as CSSProperties}>
+                        <i aria-hidden="true" />
+                        <small>{formatLegendPrice(band.minimum)}–{formatLegendPrice(band.maximum)}</small>
+                    </span>
+                ))}
+            </div>
+        </section>
+    );
 }
 
 function sameArray<T>(left: readonly T[] | null, right: readonly T[] | null) {
@@ -125,6 +167,7 @@ export function App() {
     } = rental;
 
     const [selectedGroupKey, setSelectedGroupKey] = useState<string | null>(null);
+    const [hoveredGroupKey, setHoveredGroupKey] = useState<string | null>(null);
     const [focusRequest, setFocusRequest] = useState<{ key: string; id: number } | null>(null);
     const [openPopover, setOpenPopover] = useState<Popover>(null);
     const [filtersOpen, setFiltersOpen] = useState(false);
@@ -139,7 +182,12 @@ export function App() {
     const [savedSearches, setSavedSearches] = useState<SavedSearch[]>(() => readStorage<SavedSearch[]>(STORAGE_KEYS.saved, []));
     const [theme, setTheme] = useState<'light' | 'dark'>(() => readStorage<'light' | 'dark'>(STORAGE_KEYS.theme, 'light'));
     const [searchFocused, setSearchFocused] = useState(false);
+    const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
     const [map, setMap] = useState<LeafletMap | null>(null);
+    const [draftViewport, setDraftViewport] = useState<RentalMapBounds | null>(null);
+    const [confirmedViewport, setConfirmedViewport] = useState<RentalMapBounds | null>(null);
+    const [viewportZoom, setViewportZoom] = useState(city.zoom);
+    const [clusterResultKeys, setClusterResultKeys] = useState<readonly string[] | null>(null);
     const [filtersHydrated, setFiltersHydrated] = useState(false);
     const sheetStartY = useRef<number | null>(null);
     const sheetGestureWasDrag = useRef(false);
@@ -148,17 +196,79 @@ export function App() {
     const focusRequestId = useRef(0);
     const filterTriggerRef = useRef<HTMLElement | null>(null);
     const filterDrawerRef = useRef<HTMLElement | null>(null);
+    const previousCityId = useRef(city.id);
 
-    const sortedGroups = useMemo(() => [...groups].sort((left, right) => {
+    const priceDomainMaximum = useMemo(() => {
+        const observedMaximum = listings.reduce((maximum, listing) => (
+            listing.price !== null ? Math.max(maximum, listing.price) : maximum
+        ), 0);
+        const roundedMaximum = Math.ceil(Math.max(
+            200_000,
+            observedMaximum,
+            filters.maxPrice ?? 0,
+            (filters.minPrice ?? 0) + 50_000
+        ) / 50_000) * 50_000;
+        return Math.min(RENTAL_PRICE_LIMITS.maximum, roundedMaximum);
+    }, [filters.maxPrice, filters.minPrice, listings]);
+
+    const effectivePriceMinimum = filters.minPrice ?? RENTAL_PRICE_LIMITS.minimum;
+    const effectivePriceMaximum = Math.max(effectivePriceMinimum + 1_000, filters.maxPrice ?? priceDomainMaximum);
+    const priceScale = useMemo(
+        () => createPercentagePriceScale(effectivePriceMinimum, effectivePriceMaximum),
+        [effectivePriceMaximum, effectivePriceMinimum]
+    );
+    const pricePresets = useMemo(() => [
+        { label: 'Under 40K', minimum: 0, maximum: 40_000 },
+        { label: '40–60K', minimum: 40_000, maximum: 60_000 },
+        { label: '60–80K', minimum: 60_000, maximum: 80_000 },
+        { label: '80K+', minimum: 80_000, maximum: priceDomainMaximum },
+        { label: 'Luxury', minimum: 150_000, maximum: priceDomainMaximum }
+    ], [priceDomainMaximum]);
+
+    const viewportGroups = useMemo(
+        () => groups.filter((group) => groupInBounds(group, draftViewport)),
+        [draftViewport, groups]
+    );
+
+    const sortedGroups = useMemo(() => [...viewportGroups].sort((left, right) => {
         if (sort === 'price-high') return (right.lowestPrice ?? -1) - (left.lowestPrice ?? -1);
         if (sort === 'density') return right.count - left.count || (left.lowestPrice ?? Infinity) - (right.lowestPrice ?? Infinity);
         return (left.lowestPrice ?? Infinity) - (right.lowestPrice ?? Infinity) || right.count - left.count;
-    }), [groups, sort]);
+    }), [sort, viewportGroups]);
+
+    const displayedGroups = useMemo(() => {
+        if (!clusterResultKeys) return sortedGroups;
+        const keys = new Set(clusterResultKeys);
+        return sortedGroups.filter((group) => keys.has(group.key));
+    }, [clusterResultKeys, sortedGroups]);
 
     const selectedGroup = useMemo(
         () => sortedGroups.find((group) => group.key === selectedGroupKey) ?? null,
         [selectedGroupKey, sortedGroups]
     );
+
+    const viewportSummary = useMemo(() => {
+        const prices = viewportGroups.flatMap((group) => group.listings)
+            .map((listing) => listing.price)
+            .filter((price): price is number => price !== null && Number.isFinite(price));
+        const communityCounts = new Map<string, number>();
+        for (const group of viewportGroups) {
+            const community = group.neighborhood;
+            if (community) communityCounts.set(community, (communityCounts.get(community) ?? 0) + group.count);
+        }
+        const communities = [...communityCounts.entries()]
+            .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+            .slice(0, 3);
+        return {
+            listings: viewportGroups.reduce((total, group) => total + group.count, 0),
+            minimum: prices.length ? Math.min(...prices) : null,
+            average: prices.length ? prices.reduce((total, price) => total + price, 0) / prices.length : null,
+            communities,
+            name: communities[0]?.[0] ?? city.label
+        };
+    }, [city.label, viewportGroups]);
+
+    const searchAreaPending = Boolean(draftViewport && confirmedViewport && !boundsEqual(draftViewport, confirmedViewport));
 
     const suggestions = useMemo(() => {
         const term = filters.searchTerm.trim().toLocaleLowerCase();
@@ -181,6 +291,10 @@ export function App() {
         }
         return [...unique];
     }, [filters.searchTerm, listings, recentSearches]);
+
+    useEffect(() => {
+        setActiveSuggestionIndex((current) => current >= suggestions.length ? suggestions.length - 1 : current);
+    }, [suggestions.length]);
 
     useEffect(() => {
         window.localStorage.setItem(STORAGE_KEYS.favorites, JSON.stringify([...favorites]));
@@ -210,11 +324,22 @@ export function App() {
     }, [theme]);
 
     useEffect(() => {
-        if (selectedGroupKey && !groups.some((group) => group.key === selectedGroupKey)) {
+        if (selectedGroupKey && !viewportGroups.some((group) => group.key === selectedGroupKey)) {
             setSelectedGroupKey(null);
             setFocusRequest(null);
         }
-    }, [groups, selectedGroupKey]);
+    }, [selectedGroupKey, viewportGroups]);
+
+    useEffect(() => {
+        if (previousCityId.current === city.id) return;
+        previousCityId.current = city.id;
+        setDraftViewport(null);
+        setConfirmedViewport(null);
+        setClusterResultKeys(null);
+        setSelectedGroupKey(null);
+        setHoveredGroupKey(null);
+        setViewportZoom(city.zoom);
+    }, [city.id, city.zoom]);
 
     useEffect(() => {
         const onEscape = (event: KeyboardEvent) => {
@@ -263,6 +388,8 @@ export function App() {
 
     const updateFilters = useCallback((patch: Partial<RentalFilters>) => {
         setSelectedGroupKey(null);
+        setHoveredGroupKey(null);
+        setClusterResultKeys(null);
         setFocusRequest(null);
         setFilters(patch);
     }, [setFilters]);
@@ -287,6 +414,27 @@ export function App() {
         focusRequestId.current += 1;
         setFocusRequest({ key, id: focusRequestId.current });
         setSheetExpanded(false);
+    }, []);
+
+    const handleViewportChange = useCallback((bounds: RentalMapBounds, zoom: number) => {
+        setDraftViewport((current) => boundsEqual(current, bounds) ? current : bounds);
+        setConfirmedViewport((current) => current ?? bounds);
+        setViewportZoom(zoom);
+        setClusterResultKeys(null);
+    }, []);
+
+    const commitSearchArea = useCallback(() => {
+        if (!draftViewport) return;
+        setConfirmedViewport(draftViewport);
+        setClusterResultKeys(null);
+        setSelectedGroupKey(null);
+        setHoveredGroupKey(null);
+    }, [draftViewport]);
+
+    const showClusterListings = useCallback((keys: readonly string[]) => {
+        setClusterResultKeys(keys);
+        setDesktopCollapsed(false);
+        setSheetExpanded(true);
     }, []);
 
     const handleFocusHandled = useCallback((id: number) => {
@@ -400,36 +548,25 @@ export function App() {
     const allBedrooms = facets.bedrooms.map((facet) => facet.value);
     const allTypes = facets.propertyTypes.map((facet) => facet.value);
     const anyFiltersActive = filters.minPrice !== null || filters.maxPrice !== null || filters.searchTerm.trim() || filters.bedrooms !== null || filters.propertyTypes !== null;
-    const dataLabel = expectedHits
+    const loadProgressLabel = expectedHits
         ? `${loadedCount.toLocaleString('en-AE')} of ${expectedHits.toLocaleString('en-AE')} loaded`
         : `${loadedCount.toLocaleString('en-AE')} loaded`;
+    const dataLabel = `${viewportSummary.listings.toLocaleString('en-AE')} rentals · ${viewportZoom < 12 ? 'Area view' : 'Current view'}`;
 
     const renderPriceControls = (surface: 'popover' | 'drawer') => (
         <div className={`${surface === 'popover' ? 'filter-popover__range' : 'filter-drawer__range'}`}>
-            <label>
-                Min AED
-                <input
-                    type="number"
-                    inputMode="numeric"
-                    min="0"
-                    step="1000"
-                    placeholder="Any"
-                    value={filters.minPrice ?? ''}
-                    onChange={(event) => updateFilters({ minPrice: event.target.value === '' ? null : Number(event.target.value) })}
-                />
-            </label>
-            <label>
-                Max AED
-                <input
-                    type="number"
-                    inputMode="numeric"
-                    min="0"
-                    step="1000"
-                    placeholder="Any"
-                    value={filters.maxPrice ?? ''}
-                    onChange={(event) => updateFilters({ maxPrice: event.target.value === '' ? null : Number(event.target.value) })}
-                />
-            </label>
+            <PriceRangeSlider
+                minimum={RENTAL_PRICE_LIMITS.minimum}
+                maximum={priceDomainMaximum}
+                valueMinimum={filters.minPrice ?? RENTAL_PRICE_LIMITS.minimum}
+                valueMaximum={filters.maxPrice ?? priceDomainMaximum}
+                step={1_000}
+                presets={pricePresets}
+                onChange={(minimum, maximum) => updateFilters({
+                    minPrice: minimum === RENTAL_PRICE_LIMITS.minimum ? null : minimum,
+                    maxPrice: maximum === priceDomainMaximum ? null : maximum
+                })}
+            />
         </div>
     );
 
@@ -477,13 +614,18 @@ export function App() {
             <Suspense fallback={<div className="map-loading" role="status" aria-label="Loading map" />}>
                 <RentalMap
                 city={city}
-                groups={sortedGroups}
+                groups={viewportGroups}
                 selectedGroupKey={selectedGroupKey}
+                hoveredGroupKey={hoveredGroupKey}
                 focusRequest={focusRequest}
                 theme={theme}
+                priceScale={priceScale}
                 onSelectGroup={selectGroup}
+                onHoverGroup={setHoveredGroupKey}
+                onShowCluster={showClusterListings}
                 onFocusHandled={handleFocusHandled}
-                    onMapReady={setMap}
+                onViewportChange={handleViewportChange}
+                onMapReady={setMap}
                 />
             </Suspense>
 
@@ -494,17 +636,47 @@ export function App() {
                         ref={searchRef}
                         type="search"
                         value={filters.searchTerm}
-                        onChange={(event) => updateFilters({ searchTerm: event.target.value })}
+                        onChange={(event) => {
+                            updateFilters({ searchTerm: event.target.value });
+                            setActiveSuggestionIndex(-1);
+                        }}
                         onFocus={() => setSearchFocused(true)}
                         onBlur={() => window.setTimeout(() => setSearchFocused(false), 150)}
                         onKeyDown={(event) => {
-                            if (event.key === 'Enter') {
-                                commitSearch();
+                            if (event.key === 'ArrowDown' && suggestions.length) {
+                                event.preventDefault();
+                                setActiveSuggestionIndex((current) => Math.min(suggestions.length - 1, current + 1));
+                                return;
+                            }
+                            if (event.key === 'ArrowUp' && suggestions.length) {
+                                event.preventDefault();
+                                setActiveSuggestionIndex((current) => Math.max(0, current - 1));
+                                return;
+                            }
+                            if (event.key === 'Escape') {
                                 setSearchFocused(false);
+                                setActiveSuggestionIndex(-1);
+                                return;
+                            }
+                            if (event.key === 'Enter') {
+                                const selectedSuggestion = suggestions[activeSuggestionIndex];
+                                if (selectedSuggestion) {
+                                    updateFilters({ searchTerm: selectedSuggestion });
+                                    commitSearch(selectedSuggestion);
+                                } else {
+                                    commitSearch();
+                                }
+                                setSearchFocused(false);
+                                setActiveSuggestionIndex(-1);
                             }
                         }}
                         placeholder="Search neighbourhoods or rentals"
                         aria-label="Search neighbourhoods or rental listings"
+                        role="combobox"
+                        aria-autocomplete="list"
+                        aria-expanded={searchFocused && suggestions.length > 0}
+                        aria-controls="rental-search-suggestions"
+                        aria-activedescendant={activeSuggestionIndex >= 0 ? `rental-search-suggestion-${activeSuggestionIndex}` : undefined}
                     />
                     {filters.searchTerm ? (
                         <button className="search-field__clear" type="button" onClick={() => updateFilters({ searchTerm: '' })} aria-label="Clear search">
@@ -515,18 +687,23 @@ export function App() {
                         <Search size={18} />
                     </button>
                     {searchFocused && suggestions.length ? (
-                        <div className="search-suggestions" aria-label={filters.searchTerm ? 'Search suggestions' : 'Recent searches'}>
-                            <p>{filters.searchTerm ? 'Suggestions' : recentSearches.length ? 'Recent searches' : 'Popular areas'}</p>
-                            {suggestions.map((suggestion) => (
+                        <div id="rental-search-suggestions" className="search-suggestions" role="listbox" aria-label={filters.searchTerm ? 'Search suggestions' : 'Recent searches'}>
+                            <p role="presentation">{filters.searchTerm ? 'Suggestions' : recentSearches.length ? 'Recent searches' : 'Popular areas'}</p>
+                            {suggestions.map((suggestion, index) => (
                                 <button
                                     key={suggestion}
+                                    id={`rental-search-suggestion-${index}`}
                                     type="button"
                                     className="search-suggestion"
+                                    role="option"
+                                    aria-selected={activeSuggestionIndex === index}
+                                    onMouseEnter={() => setActiveSuggestionIndex(index)}
                                     onMouseDown={(event) => event.preventDefault()}
                                     onClick={() => {
                                         updateFilters({ searchTerm: suggestion });
                                         commitSearch(suggestion);
                                         setSearchFocused(false);
+                                        setActiveSuggestionIndex(-1);
                                     }}
                                 >
                                     <Search size={15} aria-hidden="true" /> {suggestion}
@@ -571,6 +748,14 @@ export function App() {
                 </div>
             </section>
 
+            {searchAreaPending ? (
+                <button className="search-area-button" type="button" onClick={commitSearchArea}>
+                    <Search size={17} aria-hidden="true" /> Search this area
+                </button>
+            ) : null}
+
+            <PriceLegend scale={priceScale} />
+
             <aside className={`desktop-workspace${desktopCollapsed ? ' is-collapsed' : ''}${isResizingWorkspace ? ' is-resizing' : ''}`} aria-label="Rental results">
                 <header className="desktop-workspace__header">
                     <div className="desktop-workspace__brand" aria-hidden={desktopCollapsed}>
@@ -583,10 +768,25 @@ export function App() {
                 </header>
                 {!desktopCollapsed ? (
                     <div className="desktop-workspace__content">
-                        <div className="desktop-workspace__summary" role="status" aria-live="polite">
-                            <span>{status === 'loading' ? 'Finding rentals…' : `${sortedGroups.length.toLocaleString('en-AE')} places`}</span>
+                        <section className="current-area-summary" aria-labelledby="current-area-title">
+                            <span>Current map view</span>
+                            <h2 id="current-area-title">{viewportSummary.name}</h2>
                             <strong>{dataLabel}</strong>
-                        </div>
+                            <dl>
+                                <div><dt>From</dt><dd>{compactPrice(viewportSummary.minimum)}</dd></div>
+                                <div><dt>Average</dt><dd>{compactPrice(viewportSummary.average)}</dd></div>
+                            </dl>
+                            {viewportSummary.communities.length ? (
+                                <p>Top communities: {viewportSummary.communities.map(([name]) => name).join(', ')}</p>
+                            ) : null}
+                            <small>{status === 'loading' ? `Loading · ${loadProgressLabel}` : loadProgressLabel}</small>
+                        </section>
+                        {clusterResultKeys ? (
+                            <div className="cluster-results-scope" role="status">
+                                <span>Showing selected cluster</span>
+                                <button type="button" onClick={() => setClusterResultKeys(null)}>Show current view</button>
+                            </div>
+                        ) : null}
                         <label className="desktop-workspace__sort">
                             Sort
                             <select value={sort} onChange={(event) => setSort(event.target.value as SortOption)}>
@@ -600,11 +800,13 @@ export function App() {
                         </button>
                         {status === 'loading' && !groups.length ? <SkeletonCards /> : (
                             <VirtualizedResults
-                                groups={sortedGroups}
+                                groups={displayedGroups}
                                 selectedGroupKey={selectedGroupKey}
+                                hoveredGroupKey={hoveredGroupKey}
                                 favorites={favorites}
                                 compact={compactResults}
                                 onSelect={focusGroup}
+                                onHover={setHoveredGroupKey}
                                 onToggleFavorite={toggleFavorite}
                             />
                         )}
@@ -631,7 +833,7 @@ export function App() {
             <section className={`selected-preview${selectedGroup ? ' is-open' : ''}`} data-state={selectedGroup ? 'open' : 'closed'} aria-label="Selected rental preview">
                 {selectedGroup ? <>
                     <button type="button" className="selected-preview__close" onClick={() => { setSelectedGroupKey(null); setFocusRequest(null); }} aria-label="Close selected rental preview"><X size={18} /></button>
-                    <PropertyCard group={selectedGroup} selected favorite={favorites.has(selectedGroup.key)} compact onSelect={focusGroup} onToggleFavorite={toggleFavorite} />
+                    <PropertyCard group={selectedGroup} selected favorite={favorites.has(selectedGroup.key)} compact onSelect={focusGroup} onHover={setHoveredGroupKey} onToggleFavorite={toggleFavorite} />
                 </> : null}
             </section>
 
@@ -652,13 +854,14 @@ export function App() {
                     aria-label={sheetExpanded ? 'Collapse rental results' : 'Expand rental results'}
                 />
                 <header className="results-drawer__header">
-                    <div className="results-drawer__title"><strong>{sortedGroups.length.toLocaleString('en-AE')} places</strong><span>{dataLabel}</span></div>
+                    <div className="results-drawer__title"><strong>{viewportSummary.name}</strong><span>{dataLabel}</span></div>
                     <div className="results-drawer__tools">
                         <button className="results-drawer__tool" type="button" onClick={() => setCompactResults((value) => !value)} aria-label="Toggle compact result cards"><MapPinned size={16} /></button>
                         <button className="results-drawer__tool" type="button" onClick={() => setSheetExpanded((value) => !value)} aria-label={sheetExpanded ? 'Collapse results' : 'Expand results'}><ChevronDown size={18} /></button>
                     </div>
                 </header>
                 {sheetExpanded ? <div className="results-drawer__content">
+                    {clusterResultKeys ? <div className="cluster-results-scope" role="status"><span>Selected cluster</span><button type="button" onClick={() => setClusterResultKeys(null)}>Current view</button></div> : null}
                     <label className="desktop-workspace__sort">
                         Sort
                         <select value={sort} onChange={(event) => setSort(event.target.value as SortOption)}>
@@ -667,7 +870,7 @@ export function App() {
                             <option value="density">Most listings</option>
                         </select>
                     </label>
-                    {status === 'loading' && !groups.length ? <SkeletonCards /> : <VirtualizedResults groups={sortedGroups} selectedGroupKey={selectedGroupKey} favorites={favorites} compact={compactResults} onSelect={focusGroup} onToggleFavorite={toggleFavorite} />}
+                    {status === 'loading' && !groups.length ? <SkeletonCards /> : <VirtualizedResults groups={displayedGroups} selectedGroupKey={selectedGroupKey} hoveredGroupKey={hoveredGroupKey} favorites={favorites} compact={compactResults} onSelect={focusGroup} onHover={setHoveredGroupKey} onToggleFavorite={toggleFavorite} />}
                 </div> : null}
             </section>
 
@@ -709,7 +912,7 @@ export function App() {
                 <footer className="filter-drawer__footer">
                     <button className="filter-drawer__reset" type="button" onClick={() => { resetFilters(); setOpenPopover(null); }}>Reset</button>
                     <button className="button-secondary" type="button" onClick={saveCurrentSearch}><BookmarkPlus size={16} /> Save search</button>
-                    <button className="filter-drawer__apply" type="button" onClick={closeFiltersDrawer}>Show {sortedGroups.length.toLocaleString('en-AE')} places</button>
+                    <button className="filter-drawer__apply" type="button" onClick={closeFiltersDrawer}>Show {viewportSummary.listings.toLocaleString('en-AE')} rentals</button>
                 </footer>
             </aside>
 

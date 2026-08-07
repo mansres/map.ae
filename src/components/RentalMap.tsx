@@ -1,28 +1,54 @@
-import { memo, useEffect } from 'react';
-import type { Map as LeafletMap } from 'leaflet';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import type { Map as LeafletMap, Marker as LeafletMarker } from 'leaflet';
 import L from 'leaflet';
-import { MapContainer, Marker, Popup, TileLayer, ZoomControl, useMap } from 'react-leaflet';
+import { MapContainer, Marker, Popup, TileLayer, ZoomControl, useMap, useMapEvents } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 
-import type { RentalCity as City, RentalGroup } from '../types/rental';
+import { percentagePriceBandIndex } from '../../assets/rental-core.js';
+import type {
+    RentalCity as City,
+    RentalGroup,
+    RentalMapBounds,
+    RentalPriceScaleBand
+} from '../types/rental';
 
 type RentalMapProps = {
     city: City;
-    groups: RentalGroup[];
+    groups: readonly RentalGroup[];
     selectedGroupKey: string | null;
+    hoveredGroupKey: string | null;
     focusRequest: { key: string; id: number } | null;
     theme: 'light' | 'dark';
+    priceScale: readonly RentalPriceScaleBand[];
     onSelectGroup: (key: string) => void;
+    onHoverGroup: (key: string | null) => void;
+    onShowCluster: (keys: readonly string[]) => void;
     onFocusHandled: (id: number) => void;
+    onViewportChange: (bounds: RentalMapBounds, zoom: number) => void;
     onMapReady: (map: LeafletMap) => void;
 };
 
-const markerBands = ['low', 'low', 'mid-low', 'mid', 'mid-high', 'high', 'high'];
+type RentalLeafletMarker = LeafletMarker & { rentalGroup?: RentalGroup };
+
+type ClusterSummary = {
+    position: L.LatLng;
+    bounds: L.LatLngBounds;
+    groups: readonly RentalGroup[];
+    listings: number;
+    locations: number;
+    minimum: number | null;
+    maximum: number | null;
+    average: number | null;
+    communities: readonly string[];
+    propertyTypes: readonly string[];
+};
+
+const UNKNOWN_PRICE_COLOR = '#64748b';
 
 function compactPrice(value: number | null) {
-    if (value === null || !Number.isFinite(value)) return 'TBA';
-    if (value >= 1_000_000) return `AED ${(value / 1_000_000).toFixed(1)}M`;
-    return `AED ${Math.round(value / 1000)}k`;
+    if (value === null || !Number.isFinite(value)) return 'Price TBA';
+    if (value >= 1_000_000) return `AED ${(value / 1_000_000).toFixed(value % 1_000_000 ? 1 : 0)}M`;
+    return `AED ${Math.round(value / 1000)}K`;
 }
 
 function formatPrice(value: number | null) {
@@ -38,17 +64,45 @@ function bedroomLabel(value: number) {
     return value === 0 ? 'Studio' : `${value} bed${value === 1 ? '' : 's'}`;
 }
 
-function markerIcon(group: RentalGroup, selected: boolean) {
-    const band = group.priceBandIndex >= 0 ? group.priceBandIndex : 0;
-    const bandName = markerBands[band] ?? markerBands[0];
-    const count = group.count > 1 ? `<span class="rr-marker__count">${group.count > 999 ? `${Math.round(group.count / 1000)}k` : group.count}</span>` : '';
+function priceColor(price: number | null, scale: readonly RentalPriceScaleBand[]) {
+    if (!scale.length || price === null) return UNKNOWN_PRICE_COLOR;
+    const index = percentagePriceBandIndex(price, scale[0].minimum, scale[scale.length - 1].maximum);
+    return scale[index]?.color ?? UNKNOWN_PRICE_COLOR;
+}
+
+function markerIcon(group: RentalGroup, selected: boolean, hovered: boolean, scale: readonly RentalPriceScaleBand[]) {
+    const color = priceColor(group.lowestPrice, scale);
+    const count = group.count > 1
+        ? `<span class="rr-marker__count">${group.count > 999 ? `${Math.round(group.count / 1000)}K` : group.count}</span>`
+        : '';
     return L.divIcon({
         className: 'rr-marker-shell',
-        html: `<span class="rr-marker${selected ? ' is-selected' : ''}" data-band="${bandName}"><span class="rr-marker__price">${compactPrice(group.lowestPrice)}</span>${count}</span>`,
-        iconSize: [74, 48],
-        iconAnchor: [37, 44],
-        popupAnchor: [0, -40]
+        html: `<span class="rr-marker${selected ? ' is-selected' : ''}${hovered ? ' is-hovered' : ''}" style="--marker-color:${color}"><span class="rr-marker__price">${compactPrice(group.lowestPrice)}</span>${count}</span>`,
+        iconSize: [88, 44],
+        iconAnchor: [44, 42],
+        popupAnchor: [0, -38]
     });
+}
+
+function toBounds(bounds: L.LatLngBounds): RentalMapBounds {
+    return {
+        north: bounds.getNorth(),
+        south: bounds.getSouth(),
+        east: bounds.getEast(),
+        west: bounds.getWest()
+    };
+}
+
+function ViewportEvents({ onViewportChange }: { onViewportChange: RentalMapProps['onViewportChange'] }) {
+    const map = useMapEvents({
+        moveend: () => onViewportChange(toBounds(map.getBounds()), map.getZoom())
+    });
+
+    useEffect(() => {
+        onViewportChange(toBounds(map.getBounds()), map.getZoom());
+    }, [map, onViewportChange]);
+
+    return null;
 }
 
 function ViewportController({
@@ -58,7 +112,7 @@ function ViewportController({
     onFocusHandled
 }: {
     city: City;
-    groups: RentalGroup[];
+    groups: readonly RentalGroup[];
     focusRequest: { key: string; id: number } | null;
     onFocusHandled: (id: number) => void;
 }) {
@@ -101,13 +155,11 @@ function PopupContent({ group }: { group: RentalGroup }) {
         <article className="popup-card">
             {group.imageUrl ? <img src={group.imageUrl} alt="" className="popup-card__image" loading="lazy" /> : null}
             <div className="popup-card__body">
-                <p className="popup-card__eyebrow">{group.count} matching rental{group.count === 1 ? '' : 's'}</p>
+                <p className="popup-card__eyebrow">{group.count} rental{group.count === 1 ? '' : 's'} here</p>
                 <h2>{group.neighborhood || listing?.title || 'Rental location'}</h2>
                 <strong>{group.lowestPrice === null ? 'Price on request' : `From ${formatPrice(group.lowestPrice)}`}</strong>
                 {meta.length ? <p>{meta.join(' · ')}</p> : null}
-                {listing?.listingUrl ? (
-                    <a href={listing.listingUrl} target="_blank" rel="noopener noreferrer">View listing</a>
-                ) : null}
+                {listing?.listingUrl ? <a href={listing.listingUrl} target="_blank" rel="noopener noreferrer">View listing</a> : null}
             </div>
             {group.listings.length > 1 ? (
                 <div className="popup-card__list" aria-label="Listings at this location">
@@ -119,7 +171,7 @@ function PopupContent({ group }: { group: RentalGroup }) {
                             {child.listingUrl ? <a href={child.listingUrl} target="_blank" rel="noopener noreferrer">View</a> : null}
                         </div>
                     ))}
-                    {group.listings.length > 6 ? <p className="popup-card__more">+{group.listings.length - 6} more matching rentals</p> : null}
+                    {group.listings.length > 6 ? <p className="popup-card__more">+{group.listings.length - 6} more rentals</p> : null}
                 </div>
             ) : null}
         </article>
@@ -129,21 +181,40 @@ function PopupContent({ group }: { group: RentalGroup }) {
 const RentalMarker = memo(function RentalMarker({
     group,
     selected,
-    onSelectGroup
+    hovered,
+    priceScale,
+    onSelectGroup,
+    onHoverGroup
 }: {
     group: RentalGroup;
     selected: boolean;
+    hovered: boolean;
+    priceScale: readonly RentalPriceScaleBand[];
     onSelectGroup: (key: string) => void;
+    onHoverGroup: (key: string | null) => void;
 }) {
+    const markerRef = useRef<RentalLeafletMarker | null>(null);
+
+    useEffect(() => {
+        if (selected) markerRef.current?.openPopup();
+    }, [selected]);
+
     return (
         <Marker
+            ref={(marker) => {
+                markerRef.current = marker as RentalLeafletMarker | null;
+                if (markerRef.current) markerRef.current.rentalGroup = group;
+            }}
             position={[group.latitude, group.longitude]}
-            icon={markerIcon(group, selected)}
+            icon={markerIcon(group, selected, hovered, priceScale)}
             keyboard
+            riseOnHover
+            riseOffset={500}
             title={`${group.neighborhood || 'Rental location'}, ${compactPrice(group.lowestPrice)}`}
             eventHandlers={{
                 click: () => onSelectGroup(group.key),
-                mouseover: () => onSelectGroup(group.key)
+                mouseover: () => onHoverGroup(group.key),
+                mouseout: () => onHoverGroup(null)
             }}
         >
             <Popup minWidth={252} maxWidth={300} autoPanPadding={[28, 28]}>
@@ -153,7 +224,131 @@ const RentalMarker = memo(function RentalMarker({
     );
 });
 
-export function RentalMap({ city, groups, selectedGroupKey, focusRequest, theme, onSelectGroup, onFocusHandled, onMapReady }: RentalMapProps) {
+function summarizeCluster(cluster: L.MarkerCluster): ClusterSummary | null {
+    const groups = cluster.getAllChildMarkers()
+        .map((marker) => (marker as RentalLeafletMarker).rentalGroup)
+        .filter((group): group is RentalGroup => Boolean(group));
+    if (!groups.length) return null;
+    const prices = groups.flatMap((group) => group.listings)
+        .map((listing) => listing.price)
+        .filter((price): price is number => price !== null && Number.isFinite(price));
+    const communities = [...new Set(groups.map((group) => group.neighborhood).filter((value): value is string => Boolean(value)))];
+    const propertyTypes = [...new Set(groups.flatMap((group) => group.propertyTypes))];
+    return {
+        position: cluster.getLatLng(),
+        bounds: cluster.getBounds(),
+        groups,
+        listings: groups.reduce((total, group) => total + group.count, 0),
+        locations: groups.length,
+        minimum: prices.length ? Math.min(...prices) : null,
+        maximum: prices.length ? Math.max(...prices) : null,
+        average: prices.length ? prices.reduce((total, price) => total + price, 0) / prices.length : null,
+        communities: communities.slice(0, 4),
+        propertyTypes: propertyTypes.slice(0, 4)
+    };
+}
+
+function ClusterPreviewPopup({
+    summary,
+    onClose,
+    onShowCluster
+}: {
+    summary: ClusterSummary;
+    onClose: () => void;
+    onShowCluster: (keys: readonly string[]) => void;
+}) {
+    const map = useMap();
+
+    return (
+        <Popup
+            position={summary.position}
+            minWidth={270}
+            maxWidth={320}
+            autoPanPadding={[32, 32]}
+            eventHandlers={{ remove: onClose }}
+        >
+            <article className="cluster-preview">
+                <p className="cluster-preview__eyebrow">Cluster preview</p>
+                <h2>{summary.listings.toLocaleString('en-AE')} rentals</h2>
+                <dl>
+                    <div><dt>From</dt><dd>{formatPrice(summary.minimum)}</dd></div>
+                    <div><dt>Up to</dt><dd>{formatPrice(summary.maximum)}</dd></div>
+                    <div><dt>Average</dt><dd>{formatPrice(summary.average)}</dd></div>
+                    <div><dt>Locations</dt><dd>{summary.locations.toLocaleString('en-AE')}</dd></div>
+                </dl>
+                {summary.communities.length ? <p><strong>Communities</strong> {summary.communities.join(', ')}</p> : null}
+                {summary.propertyTypes.length ? <p><strong>Types</strong> {summary.propertyTypes.join(', ')}</p> : null}
+                <div className="cluster-preview__actions">
+                    <button type="button" onClick={() => {
+                        onShowCluster(summary.groups.map((group) => group.key));
+                        onClose();
+                    }}>Show listings</button>
+                    <button type="button" className="cluster-preview__zoom" onClick={() => {
+                        map.fitBounds(summary.bounds, { padding: [48, 48], animate: true, duration: 0.35 });
+                        onClose();
+                    }}>Zoom here</button>
+                </div>
+            </article>
+        </Popup>
+    );
+}
+
+export function RentalMap({
+    city,
+    groups,
+    selectedGroupKey,
+    hoveredGroupKey,
+    focusRequest,
+    theme,
+    priceScale,
+    onSelectGroup,
+    onHoverGroup,
+    onShowCluster,
+    onFocusHandled,
+    onViewportChange,
+    onMapReady
+}: RentalMapProps) {
+    const [clusterPreview, setClusterPreview] = useState<ClusterSummary | null>(null);
+    const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null);
+
+    const clusterIcon = useMemo(() => (cluster: L.MarkerCluster) => {
+        const summary = summarizeCluster(cluster);
+        const count = summary?.listings ?? cluster.getChildCount();
+        const label = count > 999 ? `${Math.round(count / 1000)}K` : String(count);
+        const minimum = summary?.minimum ?? null;
+        const color = priceColor(summary?.average ?? minimum, priceScale);
+        return L.divIcon({
+            className: 'rr-cluster-shell',
+            html: `<span class="rr-cluster" style="--cluster-color:${color}"><strong>${label}</strong><small>From ${minimum === null ? 'TBA' : compactPrice(minimum).replace('AED ', '')}</small></span>`,
+            iconSize: [78, 62],
+            iconAnchor: [39, 31]
+        });
+    }, [priceScale]);
+
+    useEffect(() => {
+        if (!clusterGroupRef.current) return;
+        (clusterGroupRef.current.options as L.MarkerClusterGroupOptions).iconCreateFunction = clusterIcon;
+        clusterGroupRef.current.refreshClusters();
+    }, [clusterIcon]);
+
+    const previewCluster = (event: L.LeafletMouseEvent) => {
+        const cluster = (event as L.LeafletMouseEvent & { layer?: L.MarkerCluster }).layer;
+        if (!cluster) return;
+        if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent);
+        const summary = summarizeCluster(cluster);
+        if (summary) setClusterPreview(summary);
+    };
+
+    const zoomCluster = (event: L.LeafletMouseEvent) => {
+        const cluster = (event as L.LeafletMouseEvent & { layer?: L.MarkerCluster }).layer;
+        if (!cluster) return;
+        if (event.originalEvent) {
+            L.DomEvent.preventDefault(event.originalEvent);
+            L.DomEvent.stopPropagation(event.originalEvent);
+        }
+        setClusterPreview(null);
+        cluster.zoomToBounds({ padding: [48, 48] });
+    };
 
     return (
         <MapContainer
@@ -167,33 +362,46 @@ export function RentalMap({ city, groups, selectedGroupKey, focusRequest, theme,
         >
             <TileLayer
                 attribution="&copy; OpenStreetMap contributors &copy; CARTO"
-                url={`https://{s}.basemaps.cartocdn.com/${theme === 'dark' ? 'dark_all' : 'light_all'}/{z}/{x}/{y}{r}.png`}
+                url={theme === 'dark'
+                    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+                    : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'}
             />
             <ZoomControl position="bottomright" />
             <MapReference onMapReady={onMapReady} />
+            <ViewportEvents onViewportChange={onViewportChange} />
             <ViewportController city={city} groups={groups} focusRequest={focusRequest} onFocusHandled={onFocusHandled} />
             <MarkerClusterGroup
+                ref={clusterGroupRef}
                 chunkedLoading
                 showCoverageOnHover={false}
+                zoomToBoundsOnClick={false}
+                spiderfyOnMaxZoom={false}
+                animate
+                animateAddingMarkers={false}
                 maxClusterRadius={58}
-                iconCreateFunction={(cluster) => {
-                    const count = cluster.getChildCount();
-                    const label = count > 999 ? `${Math.round(count / 1000)}k` : String(count);
-                    return L.divIcon({
-                        className: 'rr-cluster-shell',
-                        html: `<span class="rr-cluster"><strong>${label}</strong><small>areas</small></span>`,
-                        iconSize: [58, 58],
-                        iconAnchor: [29, 29]
-                    });
-                }}
+                iconCreateFunction={clusterIcon}
+                onClick={previewCluster}
+                onDblClick={zoomCluster}
             >
-                {groups.map((group) => <RentalMarker
-                    key={group.key}
-                    group={group}
-                    selected={group.key === selectedGroupKey}
-                    onSelectGroup={onSelectGroup}
-                />)}
+                {groups.map((group) => (
+                    <RentalMarker
+                        key={group.key}
+                        group={group}
+                        selected={group.key === selectedGroupKey}
+                        hovered={group.key === hoveredGroupKey}
+                        priceScale={priceScale}
+                        onSelectGroup={onSelectGroup}
+                        onHoverGroup={onHoverGroup}
+                    />
+                ))}
             </MarkerClusterGroup>
+            {clusterPreview ? (
+                <ClusterPreviewPopup
+                    summary={clusterPreview}
+                    onClose={() => setClusterPreview(null)}
+                    onShowCluster={onShowCluster}
+                />
+            ) : null}
         </MapContainer>
     );
 }

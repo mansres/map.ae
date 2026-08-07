@@ -4,15 +4,43 @@
  * verify.
  */
 
-export const PRICE_BANDS = Object.freeze([
-    { id: 'under-20', label: '\u2264 AED 20k', shortLabel: '\u226420k', max: 20000, color: '#0f766e' },
-    { id: '20-30', label: 'AED 20k\u201330k', shortLabel: '20\u201330k', max: 30000, color: '#0f9e8f' },
-    { id: '30-40', label: 'AED 30k\u201340k', shortLabel: '30\u201340k', max: 40000, color: '#3b82f6' },
-    { id: '40-50', label: 'AED 40k\u201350k', shortLabel: '40\u201350k', max: 50000, color: '#6366f1' },
-    { id: '50-60', label: 'AED 50k\u201360k', shortLabel: '50\u201360k', max: 60000, color: '#a855f7' },
-    { id: '60-70', label: 'AED 60k\u201370k', shortLabel: '60\u201370k', max: 70000, color: '#e11d8a' },
-    { id: 'over-70', label: 'Above AED 70k', shortLabel: '>70k', max: Infinity, color: '#e11d48' }
+export const PERCENTAGE_PRICE_COLORS = Object.freeze([
+    '#15803d',
+    '#65a30d',
+    '#ca8a04',
+    '#ea580c',
+    '#dc2626'
 ]);
+
+/**
+ * Build five equal price intervals between the active minimum and maximum.
+ * Values are percentages of the user's selected range, so the legend and map
+ * remain meaningful whether the budget ceiling is AED 80k or AED 800k.
+ */
+export function createPercentagePriceScale(minimum, maximum) {
+    const safeMinimum = Math.max(0, asFiniteNumber(minimum) ?? 0);
+    const candidateMaximum = Math.max(0, asFiniteNumber(maximum) ?? 0);
+    const safeMaximum = candidateMaximum > safeMinimum ? candidateMaximum : safeMinimum + 1;
+    const interval = (safeMaximum - safeMinimum) / PERCENTAGE_PRICE_COLORS.length;
+
+    return PERCENTAGE_PRICE_COLORS.map((color, index) => ({
+        index,
+        color,
+        minimum: safeMinimum + interval * index,
+        maximum: index === PERCENTAGE_PRICE_COLORS.length - 1
+            ? safeMaximum
+            : safeMinimum + interval * (index + 1)
+    }));
+}
+
+export function percentagePriceBandIndex(price, minimum, maximum) {
+    const value = asFiniteNumber(price);
+    if (value === null) return -1;
+    const scale = createPercentagePriceScale(minimum, maximum);
+    if (value <= scale[0].minimum) return 0;
+    const match = scale.findIndex((band) => value <= band.maximum);
+    return match === -1 ? scale.length - 1 : match;
+}
 
 const UAE_BOUNDS = Object.freeze({
     latitude: [22, 28.5],
@@ -223,21 +251,6 @@ export function normalizeListing(raw, index = 0) {
     };
 }
 
-/**
- * Price buckets are exclusive of the lower edge and inclusive of the upper
- * edge, except the first bucket which includes zero. This makes 50,000 part
- * of the 40\u201350k bucket and 50,001 part of the 50\u201360k bucket.
- */
-export function priceBandIndex(price) {
-    if (!isFiniteNumber(price) || price < 0) return -1;
-    return PRICE_BANDS.findIndex((band) => price <= band.max);
-}
-
-export function getPriceBand(price) {
-    const index = priceBandIndex(price);
-    return index === -1 ? null : PRICE_BANDS[index];
-}
-
 function selectedSet(filters, name) {
     if (!filters || !Object.prototype.hasOwnProperty.call(filters, name)) return null;
     const value = filters[name];
@@ -267,14 +280,11 @@ function filterNumber(filters, names) {
  */
 export function matchesFilters(listing, filters = {}) {
     if (!listing) return false;
-    const bands = selectedSet(filters, 'priceBands');
     const types = selectedSet(filters, 'propertyTypes');
     const bedrooms = selectedSet(filters, 'bedrooms');
     const minimumPrice = filterNumber(filters, ['minimumPrice', 'minPrice']);
     const maximumPrice = filterNumber(filters, ['maximumPrice', 'maxPrice']);
 
-    const band = priceBandIndex(listing.price);
-    if (!matchesSelection(band, bands)) return false;
     if (!matchesSelection(listing.propertyType, types)) return false;
     if (!matchesSelection(listing.bedrooms, bedrooms)) return false;
     if (minimumPrice !== null && (listing.price === null || listing.price < minimumPrice)) return false;
@@ -322,7 +332,6 @@ export function groupVisibleListings(listings, filters = {}) {
             ...group,
             count: group.listings.length,
             lowestPrice,
-            priceBandIndex: priceBandIndex(lowestPrice),
             propertyTypes: uniqueValues(group.listings.map((listing) => listing.propertyType)),
             bedrooms: uniqueValues(group.listings.map((listing) => listing.bedrooms)).sort((a, b) => a - b),
             neighborhood: representative?.neighborhood ?? null,
