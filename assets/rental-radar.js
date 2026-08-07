@@ -5,7 +5,6 @@ import {
     groupVisibleListings,
     isSafeHttpUrl,
     matchesFilters,
-    medianPrice,
     normalizeListing,
     priceBandIndex
 } from './rental-core.js';
@@ -13,12 +12,7 @@ import {
 const API_URL = window.RENTAL_RADAR_API_URL || 'https://rmi.mansoor-infos.workers.dev';
 const SEARCH_INDEX = 'property-for-rent-residential.com';
 const PAGE_CONCURRENCY = 3;
-const INITIAL_RESULT_LIMIT = 40;
 const SOURCE_PRICE_LIMITS = Object.freeze({ minimum: 10000, maximum: 80000 });
-const PRICE_RANGE_OPTIONS = Object.freeze([
-    10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000,
-    100000, 150000, 200000, 300000, 500000, 1000000
-]);
 
 const CITIES = Object.freeze([
     { id: '0', label: 'All Emirates', center: [24.840, 55.460], zoom: 8 },
@@ -50,12 +44,9 @@ const state = {
     cityId: '2',
     listings: [],
     seenIds: new Set(),
-    priceBands: new Set(PRICE_BANDS.map((_, index) => index)),
     minimumPrice: null,
     maximumPrice: null,
-    propertyTypes: new Set(),
     bedrooms: new Set(),
-    propertyTypesTouched: false,
     bedroomsTouched: false,
     expectedHits: 0,
     expectedPages: 0,
@@ -65,7 +56,6 @@ const state = {
     requestGeneration: 0,
     abortController: null,
     selectedGroupKey: null,
-    resultsLimit: INITIAL_RESULT_LIMIT,
     model: null,
     isMobile: false,
     focusRequest: null,
@@ -102,36 +92,18 @@ function bootstrap() {
         refreshData: requiredElement('refresh-data'),
         citySelect: requiredElement('city-select'),
         appStatus: requiredElement('app-status'),
-        summaryGrid: requiredElement('summary-grid'),
-        summaryListings: requiredElement('summary-listings'),
-        summaryLocations: requiredElement('summary-locations'),
-        summaryMedian: requiredElement('summary-median-value'),
-        loadProgress: requiredElement('load-progress-value'),
-        distributionList: requiredElement('distribution-list'),
-        priceFilters: requiredElement('price-filters'),
-        typeFilters: requiredElement('type-filters'),
         bedroomFilters: requiredElement('bedroom-filters'),
         minimumPrice: requiredElement('minimum-price'),
         maximumPrice: requiredElement('maximum-price'),
-        priceActions: requiredElement('price-actions'),
-        typeActions: requiredElement('type-actions'),
         bedroomActions: requiredElement('bedroom-actions'),
         activeFilters: requiredElement('active-filters'),
         filterPanel: requiredElement('filter-panel'),
-        resultsPanel: requiredElement('results-panel'),
-        resultsList: requiredElement('results-list'),
-        resultsCount: requiredElement('results-count'),
-        loadMoreResults: requiredElement('load-more-results'),
         resetFilters: requiredElement('reset-filters'),
         mobileToolbar: requiredElement('mobile-toolbar'),
         openFilters: requiredElement('open-filters'),
-        openResults: requiredElement('open-results'),
-        mobileResultCount: requiredElement('mobile-result-count'),
         sheetBackdrop: requiredElement('sheet-backdrop'),
         filterSheet: requiredElement('filter-sheet'),
-        resultsSheet: requiredElement('results-sheet'),
-        filterSheetContent: requiredElement('filter-sheet-content'),
-        resultsSheetContent: requiredElement('results-sheet-content')
+        filterSheetContent: requiredElement('filter-sheet-content')
     });
 
     populateCities();
@@ -235,11 +207,6 @@ function wireEvents() {
     ui.resetFilters.addEventListener('click', resetFilters);
     ui.filterPanel.addEventListener('click', onFilterPanelClick);
     ui.activeFilters.addEventListener('click', onActiveFilterClick);
-    ui.resultsList.addEventListener('click', onResultsListClick);
-    ui.loadMoreResults.addEventListener('click', () => {
-        state.resultsLimit += INITIAL_RESULT_LIMIT;
-        renderResults();
-    });
 
     ui.sidebarToggle.addEventListener('click', () => {
         const collapsed = ui.desktopPanel.classList.toggle('is-collapsed');
@@ -247,8 +214,7 @@ function wireEvents() {
         window.setTimeout(() => map.invalidateSize(), 250);
     });
 
-    ui.openFilters.addEventListener('click', () => openSheet('filter', ui.openFilters));
-    ui.openResults.addEventListener('click', () => openSheet('results', ui.openResults));
+    ui.openFilters.addEventListener('click', () => openFilterSheet(ui.openFilters));
     ui.sheetBackdrop.addEventListener('click', closeSheets);
     for (const closeButton of document.querySelectorAll('[data-close-sheet]')) {
         closeButton.addEventListener('click', closeSheets);
@@ -320,7 +286,6 @@ async function loadCity(cityId) {
     state.failedPages = new Set();
     state.isLoading = true;
     state.selectedGroupKey = null;
-    state.resultsLimit = INITIAL_RESULT_LIMIT;
     resetFilters({ deferRender: true });
     ui.citySelect.value = cityId;
     map.closePopup();
@@ -399,9 +364,6 @@ function acceptPage(page) {
 
 function updateUntouchedFacetSelections() {
     const facets = facetValues(state.listings);
-    if (!state.propertyTypesTouched) {
-        state.propertyTypes = new Set(facets.propertyTypes.map((facet) => facet.value));
-    }
     if (!state.bedroomsTouched) {
         state.bedrooms = new Set(facets.bedrooms.map((facet) => facet.value));
     }
@@ -413,15 +375,11 @@ function isAbortError(error) {
 
 function resetFilters(options = {}) {
     const facets = facetValues(state.listings);
-    state.priceBands = new Set(PRICE_BANDS.map((_, index) => index));
     state.minimumPrice = null;
     state.maximumPrice = null;
-    state.propertyTypes = new Set(facets.propertyTypes.map((facet) => facet.value));
     state.bedrooms = new Set(facets.bedrooms.map((facet) => facet.value));
-    state.propertyTypesTouched = false;
     state.bedroomsTouched = false;
     state.selectedGroupKey = null;
-    state.resultsLimit = INITIAL_RESULT_LIMIT;
     if (!options.deferRender) scheduleRender();
 }
 
@@ -436,10 +394,8 @@ function scheduleRender(focusRequest = null) {
 
 function currentFilters() {
     return {
-        priceBands: state.priceBands,
         minimumPrice: state.minimumPrice,
         maximumPrice: state.maximumPrice,
-        propertyTypes: state.propertyTypes,
         bedrooms: state.bedrooms
     };
 }
@@ -459,19 +415,15 @@ function buildModel() {
         visibleListings,
         groups,
         mappableListingCount,
-        unmappableListingCount,
-        median: medianPrice(visibleListings)
+        unmappableListingCount
     };
 }
 
 function render() {
     state.model = buildModel();
     renderStatus();
-    renderSummary();
-    renderDistribution();
     renderFilters();
     renderActiveFilters();
-    renderResults();
     renderMap();
     renderMobileToolbar();
     restoreRequestedFocus();
@@ -526,72 +478,10 @@ function createStatusBanner(stateName, message, showRetry = false) {
     return banner;
 }
 
-function renderSummary() {
-    const model = state.model;
-    ui.summaryListings.textContent = formatCount(model.visibleListings.length);
-    ui.summaryLocations.textContent = formatCount(model.groups.length);
-    ui.summaryMedian.textContent = model.median === null ? '—' : formatPrice(model.median);
-
-    if (!state.expectedHits) {
-        ui.loadProgress.textContent = state.isLoading ? 'Loading…' : '—';
-    } else if (state.isLoading) {
-        ui.loadProgress.textContent = formatCount(state.listings.length) + ' / ' + formatCount(state.expectedHits);
-    } else if (state.failedPages.size) {
-        ui.loadProgress.textContent = formatCount(state.listings.length) + ' partial';
-    } else {
-        ui.loadProgress.textContent = formatCount(state.listings.length) + ' loaded';
-    }
-}
-
-function renderDistribution() {
-    const counts = PRICE_BANDS.map((_, index) => state.model.visibleListings
-        .filter((listing) => priceBandIndex(listing.price) === index).length);
-    const maximum = Math.max(1, ...counts);
-    const list = document.createDocumentFragment();
-
-    PRICE_BANDS.forEach((band, index) => {
-        const row = element('div', 'distribution-row price-band-' + index);
-        row.dataset.band = String(index);
-        row.setAttribute('aria-label', band.label + ': ' + formatCount(counts[index]) + ' listings');
-        row.append(element('span', 'distribution-label', band.shortLabel));
-
-        const track = element('span', 'distribution-track');
-        const fill = element('span', 'distribution-fill');
-        fill.style.setProperty('--distribution-width', String(Math.round((counts[index] / maximum) * 100)) + '%');
-        track.append(fill);
-        row.append(track);
-        row.append(element('span', 'distribution-count', formatCount(counts[index])));
-        list.append(row);
-    });
-
-    ui.distributionList.replaceChildren(list);
-}
-
 function renderFilters() {
     const facets = facetValues(state.listings);
     renderPriceRangeControls();
-    renderFacetActions(ui.priceActions, 'price', PRICE_BANDS.map((_, index) => index), state.priceBands);
-    renderFacetActions(ui.typeActions, 'type', facets.propertyTypes.map((facet) => facet.value), state.propertyTypes);
     renderFacetActions(ui.bedroomActions, 'bedroom', facets.bedrooms.map((facet) => facet.value), state.bedrooms);
-
-    const priceChips = document.createDocumentFragment();
-    PRICE_BANDS.forEach((band, index) => {
-        const count = countFacetValue('price', index);
-        priceChips.append(createFilterChip('price', index, band.label, count, state.priceBands.has(index), index));
-    });
-    ui.priceFilters.replaceChildren(priceChips);
-
-    const typeChips = document.createDocumentFragment();
-    for (const facet of facets.propertyTypes) {
-        typeChips.append(createFilterChip(
-            'type',
-            facet.value,
-            facet.value,
-            countFacetValue('type', facet.value),
-            state.propertyTypes.has(facet.value)
-        ));
-    }
-    ui.typeFilters.replaceChildren(typeChips);
 
     const bedroomChips = document.createDocumentFragment();
     for (const facet of facets.bedrooms) {
@@ -607,24 +497,10 @@ function renderFilters() {
 }
 
 function renderPriceRangeControls() {
-    populatePriceRangeSelect(ui.minimumPrice, 'Any minimum', state.minimumPrice);
-    populatePriceRangeSelect(ui.maximumPrice, 'Any maximum', state.maximumPrice);
-}
-
-function populatePriceRangeSelect(select, placeholder, selectedValue) {
-    const fragment = document.createDocumentFragment();
-    const any = document.createElement('option');
-    any.value = '';
-    any.textContent = placeholder;
-    fragment.append(any);
-    for (const price of PRICE_RANGE_OPTIONS) {
-        const option = document.createElement('option');
-        option.value = String(price);
-        option.textContent = formatCompactPrice(price);
-        fragment.append(option);
-    }
-    select.replaceChildren(fragment);
-    select.value = selectedValue === null ? '' : String(selectedValue);
+    const minimumValue = state.minimumPrice === null ? '' : String(state.minimumPrice);
+    const maximumValue = state.maximumPrice === null ? '' : String(state.maximumPrice);
+    if (ui.minimumPrice.value !== minimumValue) ui.minimumPrice.value = minimumValue;
+    if (ui.maximumPrice.value !== maximumValue) ui.maximumPrice.value = maximumValue;
 }
 
 function onPriceRangeChange(changedBound) {
@@ -642,7 +518,6 @@ function onPriceRangeChange(changedBound) {
     }
 
     state.selectedGroupKey = null;
-    state.resultsLimit = INITIAL_RESULT_LIMIT;
     scheduleRender(changedBound === 'minimum' ? 'price-minimum' : 'price-maximum');
 }
 
@@ -674,7 +549,7 @@ function renderFacetActions(container, kind, values, selected) {
     container.append(all, clear);
 }
 
-function createFilterChip(kind, value, label, count, selected, priceIndex = null) {
+function createFilterChip(kind, value, label, count, selected) {
     const chip = element('button', 'filter-chip', null);
     chip.type = 'button';
     chip.dataset.filterKind = kind;
@@ -684,11 +559,6 @@ function createFilterChip(kind, value, label, count, selected, priceIndex = null
     chip.setAttribute('aria-label', label + ', ' + formatCount(count) + ' match' + pluralSuffix(count)
         + (selected ? ', selected' : ', not selected'));
 
-    if (priceIndex !== null) {
-        chip.dataset.band = String(priceIndex);
-        chip.classList.add('price-band-' + priceIndex);
-        chip.append(element('span', 'filter-chip-swatch'));
-    }
     chip.append(element('span', 'filter-chip-label', label));
     chip.append(element('span', 'filter-chip-count', formatCount(count)));
     return chip;
@@ -697,17 +567,13 @@ function createFilterChip(kind, value, label, count, selected, priceIndex = null
 function countFacetValue(kind, value) {
     const base = currentFilters();
     const filters = {
-        priceBands: kind === 'price' ? undefined : base.priceBands,
         minimumPrice: base.minimumPrice,
         maximumPrice: base.maximumPrice,
-        propertyTypes: kind === 'type' ? undefined : base.propertyTypes,
         bedrooms: kind === 'bedroom' ? undefined : base.bedrooms
     };
     let count = 0;
     for (const listing of state.listings) {
         if (!matchesFilters(listing, filters)) continue;
-        if (kind === 'price' && priceBandIndex(listing.price) === value) count += 1;
-        if (kind === 'type' && listing.propertyType === value) count += 1;
         if (kind === 'bedroom' && listing.bedrooms === value) count += 1;
     }
     return count;
@@ -719,7 +585,7 @@ function onFilterPanelClick(event) {
     const kind = control.dataset.filterKind;
     const action = control.dataset.filterAction || 'toggle';
     const rawValue = control.dataset.filterValue;
-    const value = kind === 'price' || kind === 'bedroom' ? Number(rawValue) : rawValue;
+    const value = Number(rawValue);
     const selection = selectionForKind(kind);
     const allValues = allValuesForKind(kind);
     if (!selection) return;
@@ -734,24 +600,18 @@ function onFilterPanelClick(event) {
         selection.add(value);
     }
 
-    if (kind === 'type') state.propertyTypesTouched = true;
     if (kind === 'bedroom') state.bedroomsTouched = true;
     state.selectedGroupKey = null;
-    state.resultsLimit = INITIAL_RESULT_LIMIT;
     scheduleRender(action === 'toggle' ? kind + ':' + String(value) : null);
 }
 
 function selectionForKind(kind) {
-    if (kind === 'price') return state.priceBands;
-    if (kind === 'type') return state.propertyTypes;
     if (kind === 'bedroom') return state.bedrooms;
     return null;
 }
 
 function allValuesForKind(kind) {
-    if (kind === 'price') return PRICE_BANDS.map((_, index) => index);
     const facets = facetValues(state.listings);
-    if (kind === 'type') return facets.propertyTypes.map((facet) => facet.value);
     if (kind === 'bedroom') return facets.bedrooms.map((facet) => facet.value);
     return [];
 }
@@ -819,7 +679,6 @@ function onActiveFilterClick(event) {
         state.minimumPrice = null;
         state.maximumPrice = null;
         state.selectedGroupKey = null;
-        state.resultsLimit = INITIAL_RESULT_LIMIT;
         scheduleRender();
         return;
     }
@@ -830,12 +689,10 @@ function onActiveFilterClick(event) {
         replaceSet(selection, allValuesForKind(kind));
     } else {
         const rawValue = button.dataset.activeValue;
-        selection.delete(kind === 'price' || kind === 'bedroom' ? Number(rawValue) : rawValue);
+        selection.delete(Number(rawValue));
     }
-    if (kind === 'type') state.propertyTypesTouched = true;
     if (kind === 'bedroom') state.bedroomsTouched = true;
     state.selectedGroupKey = null;
-    state.resultsLimit = INITIAL_RESULT_LIMIT;
     scheduleRender();
 }
 
@@ -1026,7 +883,7 @@ function renderMap() {
             autoPanPadding: [24, 24]
         });
         marker.on('click', () => {
-            selectGroup(group.key, { focusMap: false, scrollCard: true });
+            selectGroup(group.key);
         });
         markerLayer.addLayer(marker);
         markerByGroup.set(group.key, marker);
@@ -1087,18 +944,9 @@ function createPopup(group) {
 }
 
 function selectGroup(key, options = {}) {
-    const groupIndex = state.model.groups.findIndex((group) => group.key === key);
-    if (groupIndex === -1) return;
+    if (!state.model.groups.some((group) => group.key === key)) return;
     state.selectedGroupKey = key;
-    if (groupIndex >= state.resultsLimit) state.resultsLimit = groupIndex + 1;
-    renderResults();
     updateSelectedVisuals();
-
-    if (options.scrollCard !== false) {
-        const card = [...ui.resultsList.querySelectorAll('.result-card')]
-            .find((candidate) => candidate.dataset.groupKey === key);
-        if (card) card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    }
     if (options.focusMap) focusGroupOnMap(key);
 }
 
@@ -1118,11 +966,6 @@ function focusGroupOnMap(key) {
 }
 
 function updateSelectedVisuals() {
-    for (const card of ui.resultsList.querySelectorAll('.result-card')) {
-        const selected = card.dataset.groupKey === state.selectedGroupKey;
-        card.classList.toggle('is-selected', selected);
-        card.dataset.selected = String(selected);
-    }
     for (const [key, marker] of markerByGroup) {
         const node = marker.getElement();
         const pin = node && node.querySelector('.map-marker');
@@ -1141,10 +984,6 @@ function renderMobileToolbar() {
         activeCount
             ? 'Open filters, ' + activeCount + ' active'
             : 'Open filters'
-    );
-    ui.openResults.setAttribute(
-        'aria-label',
-        'Open results, ' + formatCount(state.model.groups.length) + ' locations'
     );
 }
 
@@ -1165,29 +1004,21 @@ function moveResponsiveContent() {
     if (shouldUseMobile) {
         ui.filterSheetContent.append(
             ui.appStatus,
-            ui.summaryGrid,
-            document.getElementById('price-distribution'),
             ui.activeFilters,
             ui.filterPanel
         );
-        ui.resultsSheetContent.append(ui.resultsPanel);
     } else {
         ui.sidebar.append(
             ui.appStatus,
-            ui.summaryGrid,
-            document.getElementById('price-distribution'),
             ui.activeFilters,
-            ui.filterPanel,
-            ui.resultsPanel
+            ui.filterPanel
         );
     }
 }
 
-function openSheet(kind, trigger) {
+function openFilterSheet(trigger) {
     if (!state.isMobile) return;
-    const target = kind === 'results' ? ui.resultsSheet : ui.filterSheet;
-    const other = kind === 'results' ? ui.filterSheet : ui.resultsSheet;
-    closeSpecificSheet(other, { restoreFocus: false });
+    const target = ui.filterSheet;
     state.lastSheetTrigger = trigger || null;
     target.classList.add('is-open');
     target.setAttribute('aria-hidden', 'false');
@@ -1200,9 +1031,8 @@ function openSheet(kind, trigger) {
 }
 
 function closeSheets(options = {}) {
-    const wasOpen = ui.filterSheet?.classList.contains('is-open') || ui.resultsSheet?.classList.contains('is-open');
+    const wasOpen = ui.filterSheet?.classList.contains('is-open');
     closeSpecificSheet(ui.filterSheet, { restoreFocus: false });
-    closeSpecificSheet(ui.resultsSheet, { restoreFocus: false });
     if (ui.sheetBackdrop) {
         ui.sheetBackdrop.classList.remove('is-visible');
         ui.sheetBackdrop.setAttribute('aria-hidden', 'true');
@@ -1223,16 +1053,14 @@ function closeSpecificSheet(sheet, options = {}) {
 
 function onDocumentKeydown(event) {
     if (event.key === 'Escape') {
-        if (ui.filterSheet.classList.contains('is-open') || ui.resultsSheet.classList.contains('is-open')) {
+        if (ui.filterSheet.classList.contains('is-open')) {
             event.preventDefault();
             closeSheets();
         }
         return;
     }
     if (event.key !== 'Tab') return;
-    const sheet = ui.filterSheet.classList.contains('is-open')
-        ? ui.filterSheet
-        : ui.resultsSheet.classList.contains('is-open') ? ui.resultsSheet : null;
+    const sheet = ui.filterSheet.classList.contains('is-open') ? ui.filterSheet : null;
     if (!sheet) return;
 
     const focusable = [...sheet.querySelectorAll(

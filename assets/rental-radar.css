@@ -404,7 +404,8 @@ img {
 }
 
 .filter-group select,
-.select-control {
+.select-control,
+.price-input {
   width: 100%;
   min-height: 40px;
   padding: 8px 34px 8px 10px;
@@ -419,12 +420,14 @@ img {
 }
 
 .filter-group select:hover,
-.select-control:hover {
+.select-control:hover,
+.price-input:hover {
   border-color: #9cacc0;
 }
 
 .filter-group select:focus,
-.select-control:focus {
+.select-control:focus,
+.price-input:focus {
   border-color: var(--rr-primary);
   box-shadow: 0 0 0 3px rgb(29 78 216 / 13%);
 }
@@ -461,13 +464,22 @@ img {
 
 #minimum-price,
 #maximum-price {
+  width: 100%;
   min-width: 0;
   min-height: 38px;
-  padding: 7px 30px 7px 9px;
+  padding: 7px 9px;
+  appearance: textfield;
+  background: var(--rr-surface);
   font-size: 11px;
   font-weight: 680;
   letter-spacing: 0;
   text-transform: none;
+}
+
+#minimum-price::-webkit-inner-spin-button,
+#maximum-price::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
 }
 
 .filter-actions button,
@@ -1576,7 +1588,7 @@ img {
     bottom: max(12px, env(safe-area-inset-bottom));
     left: 12px;
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
     gap: 9px;
     pointer-events: none;
   }
@@ -1587,7 +1599,6 @@ img {
   }
 
   #open-filters,
-  #open-results,
   .mobile-toolbar button {
     display: inline-flex;
     min-height: 48px;
@@ -1608,18 +1619,15 @@ img {
   }
 
   #open-filters:hover,
-  #open-results:hover,
   .mobile-toolbar button:hover {
     background: #fff;
   }
 
   #open-filters:active,
-  #open-results:active,
   .mobile-toolbar button:active {
     transform: translateY(1px);
   }
 
-  #open-results .mobile-action-count,
   .mobile-action-count {
     display: inline-grid;
     min-width: 19px;
@@ -1760,7 +1768,6 @@ img {
   }
 
   #open-filters,
-  #open-results,
   .mobile-toolbar button {
     min-height: 42px;
   }

@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#f4f7fb">
-    <meta name="description" content="A live, filterable rental map with grouped listings and location results.">
+    <meta name="description" content="A live, filterable rental map with price and bedroom controls.">
     <title>Rental Radar</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -77,28 +77,14 @@
                         <legend>Price range (AED)</legend>
                         <div id="price-range-filters" class="price-range-controls">
                             <label for="minimum-price">Min
-                                <select id="minimum-price" class="select-control" aria-label="Minimum price"></select>
+                                <input id="minimum-price" class="price-input" type="number" inputmode="numeric"
+                                    min="0" step="1000" placeholder="Any" aria-label="Minimum price in AED">
                             </label>
                             <label for="maximum-price">Max
-                                <select id="maximum-price" class="select-control" aria-label="Maximum price"></select>
+                                <input id="maximum-price" class="price-input" type="number" inputmode="numeric"
+                                    min="0" step="1000" placeholder="Any" aria-label="Maximum price in AED">
                             </label>
                         </div>
-                    </fieldset>
-
-                    <fieldset class="filter-group price-band-group" aria-hidden="true">
-                        <legend>
-                            <span>Price bands</span>
-                            <span id="price-actions" class="filter-actions"></span>
-                        </legend>
-                        <div id="price-filters" class="filter-chips" aria-label="Price band filters"></div>
-                    </fieldset>
-
-                    <fieldset class="filter-group property-type-group" aria-hidden="true">
-                        <legend>
-                            <span>Property type</span>
-                            <span id="type-actions" class="filter-actions"></span>
-                        </legend>
-                        <div id="type-filters" class="filter-chips" aria-label="Property type filters"></div>
                     </fieldset>
 
                     <fieldset class="filter-group">
@@ -112,21 +98,11 @@
                     <button id="reset-filters" type="button">Reset all filters</button>
                 </section>
 
-                <section id="results-panel" aria-labelledby="results-title">
-                    <header class="results-header">
-                        <h2 id="results-title">Matching locations</h2>
-                        <span id="results-count" class="results-count">0 locations</span>
-                    </header>
-                    <div id="results-list" aria-live="polite"></div>
-                    <button id="load-more-results" type="button" hidden>Show more locations</button>
-                </section>
             </section>
         </aside>
 
         <nav id="mobile-toolbar" aria-label="Map controls">
             <button id="open-filters" type="button">Filters</button>
-            <button id="open-results" type="button">Results <span id="mobile-result-count"
-                    class="mobile-action-count">0</span></button>
         </nav>
 
         <div id="sheet-backdrop" aria-hidden="true"></div>
@@ -140,14 +116,6 @@
             <div id="filter-sheet-content" class="sheet-content"></div>
         </section>
 
-        <section id="results-sheet" class="mobile-sheet" role="dialog" aria-modal="false"
-            aria-labelledby="results-sheet-title" aria-hidden="true">
-            <header class="sheet-header">
-                <h2 id="results-sheet-title">Matching locations</h2>
-                <button class="sheet-close" type="button" data-close-sheet aria-label="Close results">&times;</button>
-            </header>
-            <div id="results-sheet-content" class="sheet-content"></div>
-        </section>
     </main>
 
     <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
