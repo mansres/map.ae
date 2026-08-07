@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Property Radar</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css">
+
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #ffffff;
+            --text-primary: #0f172a;
+            --text-sec: #475569;
+            --border-color: #cbd5e1;
+            --primary-color: #2563eb;
+            --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+
+            --dash-bg: rgba(255, 255, 255, 0.98);
+            --dash-border: rgba(255, 255, 255, 0.4);
+            --input-bg: #f8fafc;
+            --popup-bg: #ffffff;
+        }
+
+        body.theme-transparent {
+            --dash-bg: rgba(255, 255, 255, 0);
+            --dash-border: transparent;
+            --shadow-lg: none;
+        }
+
+        body.theme-dark {
+            --text-primary: #f8fafc;
+            --text-sec: #94a3b8;
+            --border-color: #334155;
+            --dash-bg: rgba(15, 23, 42, 0.9);
+            --dash-border: rgba(255, 255, 255, 0.1);
+            --input-bg: #1e293b;
+            --popup-bg: #1e293b;
+        }
+
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: 'Inter', sans-serif;
+            background: #e2e8f0;
+            color: var(--text-primary);
+            overflow: hidden;
+        }
+
+        #map {
+            height: 100vh;
+            width: 100%;
+            z-index: 1;
+        }
+
+        /* Floating Dashboard */
+        .dashboard {
+            position: absolute;
+            top: 24px;
+            left: 24px;
+            width: 340px;
+            max-height: calc(100vh - 48px);
+            background: var(--dash-bg);
+            backdrop-filter: blur(12px);
+            border-radius: 16px;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--dash-border);
+            z-index: 1000;
+            text-shadow: 0 1px 2px rgba(255, 255, 255, 0.7);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .dashboard-header {
+            padding: 24px 24px 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .dashboard-header h1 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        .dashboard-header p {
+            margin: 4px 0 0 0;
+            font-size: 13px;
+            color: var(--text-sec);
+        }
+
+        .dashboard-content {
+            padding: 0 24px 24px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .dashboard-content::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .dashboard-content::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+
+        .form-group {
+            margin-top: 24px;
+        }
+
+        .section-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 700;
+            color: var(--text-sec);
+            margin: 0 0 12px 0;
+        }
+
+        .select-control {
+            width: 100%;
+            padding: 12px 14px;
+            font-size: 14px;
+            font-family: inherit;
+            color: var(--text-primary);
+            background: var(--input-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            outline: none;
+            transition: all 0.2s;
+            cursor: pointer;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .select-control:hover,
+        .select-control:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .checkbox-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .checkbox-item input[type="checkbox"] {
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border: 2px solid #94a3b8;
+            border-radius: 4px;
+            margin-right: 12px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .checkbox-item input[type="checkbox"]:checked {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+
+        .checkbox-item input[type="checkbox"]:checked::after {
+            content: '';
+            position: absolute;
+            left: 5px;
+            top: 2px;
+            width: 4px;
+            height: 8px;
+            border: solid white;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+        }
+
+        .checkbox-label {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-primary);
+            user-select: none;
+        }
+
+        .select-all-item {
+            padding-bottom: 12px;
+            margin-bottom: 4px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .legend-color {
+            width: 14px;
+            height: 14px;
+            border-radius: 4px;
+            margin-right: 12px;
+            box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Custom Markers */
+        .marker-inner {
+            position: relative;
+            width: 24px;
+            height: 24px;
+            border: 2.5px solid white;
+            border-radius: 50% 50% 50% 0;
+            transform: rotate(-45deg);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .marker-inner::after {
+            content: '';
+            width: 8px;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 50%;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .custom-marker:hover .marker-inner {
+            transform: scale(1.2) translateY(-4px) rotate(-45deg) !important;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4) !important;
+            z-index: 2000 !important;
+        }
+
+        /* Popup */
+        .leaflet-popup-content-wrapper {
+            background: var(--popup-bg);
+            border-radius: 12px;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--border-color);
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .leaflet-popup-content {
+            margin: 0;
+            width: 280px !important;
+        }
+
+        .leaflet-popup-tip-container {
+            display: none;
+        }
+
+        .popup-inner {
+            max-height: 380px;
+            overflow-y: auto;
+        }
+
+        .popup-list-item {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .popup-list-item:last-child {
+            border-bottom: none;
+        }
+
+        .popup-price {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+            letter-spacing: -0.02em;
+        }
+
+        .popup-type {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .popup-meta {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 12px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-sec);
+        }
+
+        .popup-desc {
+            font-size: 14px;
+            color: var(--text-sec);
+            line-height: 1.5;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            margin-bottom: 16px;
+        }
+
+        .btn-view {
+            display: block;
+            text-align: center;
+            background: var(--input-bg);
+            color: var(--primary-color);
+            text-decoration: none;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            border: 1px solid var(--border-color);
+            transition: all 0.2s;
+        }
+
+        .btn-view:hover {
+            filter: brightness(0.95);
+        }
+
+        /* Loader Overlay */
+        #loader-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(4px);
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        #loader-overlay.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid #e2e8f0;
+            border-top-color: var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .loader-text {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .disclaimer {
+            position: absolute;
+            bottom: 12px;
+            right: 12px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            color: var(--text-sec);
+            z-index: 1000;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border-color);
+            pointer-events: none;
+        }
+
+        /* Improve Leaflet Controls Position */
+        .leaflet-right .leaflet-control {
+            margin-right: 24px;
+        }
+
+        .leaflet-top .leaflet-control {
+            margin-top: 24px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="loader-overlay" class="active">
+        <div class="spinner"></div>
+        <div class="loader-text" id="loader-msg">Fetching Market Data...</div>
+        <div id="debug-log" style="color: red; margin-top: 10px; font-size: 12px; max-width: 80%; text-align: center;">
+        </div>
+    </div>
+
+    <script>
+        window.onerror = function (msg, url, lineNo, columnNo, error) {
+            document.getElementById('debug-log').innerHTML += msg + " at line " + lineNo + "<br>";
+            return false;
+        };
+    </script>
+
+    <div id="map"></div>
+
+    <div class="dashboard">
+        <div class="dashboard-header">
+            <h1>Property Radar</h1>
+            <p>Real-time projects map</p>
+        </div>
+        <div class="dashboard-content">
+            <div class="form-group">
+                <h4 class="section-title">Location</h4>
+                <select id="emiratesSelect" class="select-control">
+                    <option value="0">All Emirates</option>
+                    <option value="2" selected="selected">Dubai</option>
+                    <option value="3">Abu Dhabi</option>
+                    <option value="12">Sharjah</option>
+                    <option value="14">Ajman</option>
+                    <option value="11">Ras Al Khaimah</option>
+                    <option value="13">Fujairah</option>
+                    <option value="15">Umm Al Quwain</option>
+                    <option value="39">Al Ain</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <h4 class="section-title">Status</h4>
+                <select id="statusSelect" class="select-control">
+                    <option value="all" selected>All Statuses</option>
+                    <option value="offplan">Off-Plan</option>
+                    <option value="ready">Ready</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <h4 class="section-title">Starting Price (AED)</h4>
+                <div id="price-range-label"
+                    style="font-size: 11px; margin-top: -8px; margin-bottom: 12px; color: var(--primary-color); font-weight: 600;">
+                    Min: 0 | Max: 0</div>
+                <div id="legend-items" class="checkbox-list"></div>
+            </div>
+
+            <!-- Developer filter removed -->
+
+            <div class="form-group">
+                <h4 class="section-title">Category</h4>
+                <div id="category-filters" class="checkbox-list"></div>
+            </div>
+
+            <div class="form-group">
+                <h4 class="section-title">Bedrooms</h4>
+                <div id="bedroom-filters" class="checkbox-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet Scripts -->
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+
+    <script>
+        var map = L.map("map", { zoomControl: false }).setView([25.276987, 55.296249], 11);
+        L.control.zoom({ position: 'topright' }).addTo(map);
+
+        var streetDetailed = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            maxZoom: 19, attribution: "© OpenStreetMap contributors"
+        });
+
+        var darkMap = L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+            maxZoom: 19, attribution: "© CARTO"
+        });
+
+        var lightMap = L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+            maxZoom: 19, attribution: "© CARTO"
+        });
+
+        var esriSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 19, attribution: 'Tiles © Esri'
+        });
+
+        streetDetailed.addTo(map);
+
+        var baseMaps = {
+            "Detailed Streets (Default)": streetDetailed,
+            "Light Mode": lightMap,
+            "Dark Mode": darkMap,
+            "Satellite 3D": esriSatellite
+        };
+
+        L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
+
+        document.body.className = 'theme-transparent'; // Initial loaded theme
+        map.on('baselayerchange', function (e) {
+            document.body.className = '';
+            if (e.name === "Dark Mode") {
+                document.body.classList.add('theme-dark');
+            } else if (e.name === "Detailed Streets (Default)" || e.name === "Satellite 3D") {
+                document.body.classList.add('theme-transparent');
+            }
+        });
+
+        var markers = [];
+        var responseData = [];
+
+        let categoryFilters = new Set();
+        let bedroomFilters = new Set();
+
+        const priceRanges = [
+            { max: 300000, color: '#10b981' },
+            { max: 500000, color: '#22c55e' },
+            { max: 1000000, color: '#84cc16' },
+            { max: 1500000, color: '#eab308' },
+            { max: 2000000, color: '#f59e0b' },
+            { max: 3000000, color: '#f97316' },
+            { max: 5000000, color: '#ef4444' },
+            { max: Infinity, color: '#be123c' }
+        ];
+
+        const visibleRanges = new Set(priceRanges.map((_, index) => index));
+
+        function getMarkerColor(price) {
+            if (!price) return '#94a3b8'; // gray for no price
+            for (const range of priceRanges) {
+                if (price <= range.max) return range.color;
+            }
+            return '#be123c';
+        }
+
+        function formatShortPrice(price) {
+            if (!price) return "TBA";
+            if (price >= 1000000) return (price / 1000000).toFixed(1) + 'M';
+            if (price >= 10000) return Math.round(price / 1000) + 'k';
+            if (price >= 1000) return (price / 1000).toFixed(1) + 'k';
+            return price;
+        }
+
+        // Lightweight IndexedDB Cache Wrapper
+        const CACHE_DB_NAME = 'SalesRadarCache';
+        const CACHE_STORE_NAME = 'apiData';
+
+        function getCache(key) {
+            return new Promise((resolve) => {
+                const req = indexedDB.open(CACHE_DB_NAME, 1);
+                req.onupgradeneeded = e => e.target.result.createObjectStore(CACHE_STORE_NAME);
+                req.onsuccess = e => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains(CACHE_STORE_NAME)) return resolve(null);
+                    const tx = db.transaction(CACHE_STORE_NAME, 'readonly');
+                    const store = tx.objectStore(CACHE_STORE_NAME);
+                    const getReq = store.get(key);
+                    getReq.onsuccess = () => resolve(getReq.result);
+                    getReq.onerror = () => resolve(null);
+                };
+                req.onerror = () => resolve(null);
+            });
+        }
+
+        function setCache(key, data) {
+            return new Promise((resolve) => {
+                const req = indexedDB.open(CACHE_DB_NAME, 1);
+                req.onupgradeneeded = e => e.target.result.createObjectStore(CACHE_STORE_NAME);
+                req.onsuccess = e => {
+                    const db = e.target.result;
+                    const tx = db.transaction(CACHE_STORE_NAME, 'readwrite');
+                    const store = tx.objectStore(CACHE_STORE_NAME);
+                    store.put(data, key);
+                    tx.oncomplete = () => resolve();
+                };
+            });
+        }
+
+        // Filters Creation
+
+        function createCategoryFilters() {
+            const categories = new Map();
+            responseData[0].hits.forEach(location => {
+                let primaryCat = undefined;
+                if (location.categories_v2) {
+                    if (Array.isArray(location.categories_v2) && location.categories_v2.length > 0) {
+                        primaryCat = location.categories_v2[0].name.en[0];
+                    } else if (location.categories_v2.name && location.categories_v2.name.en) {
+                        primaryCat = Array.isArray(location.categories_v2.name.en) ? location.categories_v2.name.en[0] : location.categories_v2.name.en;
+                    }
+                }
+                if (!primaryCat && location.category_v2 && location.category_v2.slug_paths) {
+                    primaryCat = Array.isArray(location.category_v2.slug_paths) ? location.category_v2.slug_paths[0] : location.category_v2.slug_paths;
+                }
+
+                if (primaryCat) {
+                    primaryCat = Array.isArray(primaryCat) ? primaryCat[0] : String(primaryCat);
+                    categories.set(primaryCat, (categories.get(primaryCat) || 0) + 1);
+                }
+            });
+
+            const container = document.getElementById('category-filters');
+            container.innerHTML = '';
+
+            const selectAllCheckboxes = createSelectAll(container, 'select-all-cats');
+            const typeCheckboxes = [];
+
+            categories.forEach((count, cat) => {
+                categoryFilters.add(cat);
+                const safeCatId = cat.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
+                const obj = createFilterItem('cat-' + safeCatId, `${cat} (${count})`);
+                typeCheckboxes.push(obj.checkbox);
+
+                obj.checkbox.addEventListener('change', (e) => {
+                    if (e.target.checked) categoryFilters.add(cat);
+                    else categoryFilters.delete(cat);
+                    selectAllCheckboxes.checked = typeCheckboxes.every(cb => cb.checked);
+                    updateMarkerVisibility();
+                });
+                container.appendChild(obj.item);
+            });
+
+            selectAllCheckboxes.addEventListener('change', (e) => {
+                const isChecked = e.target.checked;
+                typeCheckboxes.forEach((cb, idx) => {
+                    cb.checked = isChecked;
+                    const cat = Array.from(categories.keys())[idx];
+                    if (isChecked) categoryFilters.add(cat);
+                    else categoryFilters.delete(cat);
+                });
+                updateMarkerVisibility();
+            });
+        }
+
+        function createBedroomFilters() {
+            const bedrooms = new Map();
+            responseData[0].hits.forEach(location => {
+                let beds = location.bedrooms || location.bedrooms_name || location.size_name;
+                if (beds !== undefined && beds !== null) {
+                    let bedStr = String(beds).toLowerCase();
+                    if (bedStr === '0' || bedStr.includes('studio')) {
+                        bedStr = 'Studio';
+                    } else if (!isNaN(parseInt(bedStr))) {
+                        bedStr = parseInt(bedStr) + ' BHK';
+                    } else {
+                        bedStr = String(beds);
+                    }
+                    bedrooms.set(bedStr, (bedrooms.get(bedStr) || 0) + 1);
+                }
+            });
+
+            const container = document.getElementById('bedroom-filters');
+            container.innerHTML = '';
+
+            const selectAllCheckboxes = createSelectAll(container, 'select-all-beds');
+            const typeCheckboxes = [];
+
+            // Sort map primarily by Studio first, then numerical order
+            const sortedBeds = Array.from(bedrooms.entries()).sort((a, b) => {
+                if (a[0] === 'Studio') return -1;
+                if (b[0] === 'Studio') return 1;
+                return parseInt(a[0]) - parseInt(b[0]);
+            });
+
+            sortedBeds.forEach(([bed, count]) => {
+                bedroomFilters.add(bed);
+                const safeId = bed.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
+                const obj = createFilterItem('bed-' + safeId, `${bed} (${count})`);
+                typeCheckboxes.push(obj.checkbox);
+
+                obj.checkbox.addEventListener('change', (e) => {
+                    if (e.target.checked) bedroomFilters.add(bed);
+                    else bedroomFilters.delete(bed);
+                    selectAllCheckboxes.checked = typeCheckboxes.every(cb => cb.checked);
+                    updateMarkerVisibility();
+                });
+                container.appendChild(obj.item);
+            });
+
+            selectAllCheckboxes.addEventListener('change', (e) => {
+                const isChecked = e.target.checked;
+                typeCheckboxes.forEach((cb, idx) => {
+                    cb.checked = isChecked;
+                    const bed = sortedBeds[idx][0];
+                    if (isChecked) bedroomFilters.add(bed);
+                    else bedroomFilters.delete(bed);
+                });
+                updateMarkerVisibility();
+            });
+        }
+
+        function createLegend() {
+            const container = document.getElementById('legend-items');
+            container.innerHTML = '';
+
+            const selectAllCheckboxes = createSelectAll(container, 'select-all-prices');
+            const priceCheckboxes = [];
+
+            priceRanges.forEach((range, index) => {
+                const item = document.createElement('label');
+                item.className = 'checkbox-item popup-list-item';
+                item.style.padding = '0'; item.style.border = 'none';
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.checked = true;
+                priceCheckboxes.push(checkbox);
+
+                const colorBox = document.createElement('div');
+                colorBox.className = 'legend-color';
+                colorBox.style.backgroundColor = range.color;
+
+                const label = document.createElement('span');
+                label.className = 'checkbox-label';
+                label.textContent = range.max === Infinity ? `Above ${formatShortPrice(priceRanges[priceRanges.length - 2].max)}` : `Up to ${formatShortPrice(range.max)}`;
+
+                checkbox.addEventListener('change', () => {
+                    if (checkbox.checked) visibleRanges.add(index);
+                    else visibleRanges.delete(index);
+                    selectAllCheckboxes.checked = priceCheckboxes.every(cb => cb.checked);
+                    updateMarkerVisibility();
+                });
+
+                item.appendChild(checkbox);
+                item.appendChild(colorBox);
+                item.appendChild(label);
+                container.appendChild(item);
+            });
+
+            selectAllCheckboxes.addEventListener('change', (e) => {
+                const isChecked = e.target.checked;
+                priceCheckboxes.forEach((cb, index) => {
+                    cb.checked = isChecked;
+                    if (isChecked) visibleRanges.add(index);
+                    else visibleRanges.delete(index);
+                });
+                updateMarkerVisibility();
+            });
+        }
+
+        function createSelectAll(container, id) {
+            const item = document.createElement('label');
+            item.className = 'checkbox-item select-all-item';
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox'; checkbox.checked = true; checkbox.id = id;
+            const label = document.createElement('span');
+            label.className = 'checkbox-label'; label.textContent = 'Select All';
+            item.appendChild(checkbox); item.appendChild(label);
+            container.appendChild(item);
+            return checkbox;
+        }
+
+        function createFilterItem(id, text) {
+            const item = document.createElement('label');
+            item.className = 'checkbox-item';
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox'; checkbox.checked = true; checkbox.id = id;
+            const label = document.createElement('span');
+            label.className = 'checkbox-label'; label.textContent = text;
+            item.appendChild(checkbox); item.appendChild(label);
+            return { item, checkbox };
+        }
+
+        function updateMarkerVisibility() {
+            const selectedStatus = document.getElementById('statusSelect').value;
+            const selectedEmirate = parseInt(document.getElementById('emiratesSelect').value);
+
+            let currentMinPrice = Infinity;
+            let currentMaxPrice = 0;
+            let visibleCount = 0;
+
+            markers.forEach(marker => {
+                const price = marker.price;
+                let cat = undefined;
+                if (marker.propertyData.categories_v2) {
+                    if (Array.isArray(marker.propertyData.categories_v2) && marker.propertyData.categories_v2.length > 0) {
+                        cat = marker.propertyData.categories_v2[0].name.en[0];
+                    } else if (marker.propertyData.categories_v2.name && marker.propertyData.categories_v2.name.en) {
+                        cat = Array.isArray(marker.propertyData.categories_v2.name.en) ? marker.propertyData.categories_v2.name.en[0] : marker.propertyData.categories_v2.name.en;
+                    }
+                }
+                if (!cat && marker.propertyData.category_v2 && marker.propertyData.category_v2.slug_paths) {
+                    cat = Array.isArray(marker.propertyData.category_v2.slug_paths) ? marker.propertyData.category_v2.slug_paths[0] : marker.propertyData.category_v2.slug_paths;
+                }
+
+                let rawBed = marker.propertyData.bedrooms || marker.propertyData.bedrooms_name || marker.propertyData.size_name;
+                let bed = undefined;
+                if (rawBed !== undefined && rawBed !== null) {
+                    bed = String(rawBed).toLowerCase();
+                    if (bed === '0' || bed.includes('studio')) bed = 'Studio';
+                    else if (!isNaN(parseInt(bed))) bed = parseInt(bed) + ' BHK';
+                    else bed = String(rawBed);
+                }
+
+
+                // The status and emirate are now filtered securely via API, so we just pass true
+                let statusMatch = true;
+                let emirateMatch = true;
+
+                let rangeIndex = priceRanges.findIndex(r => price <= r.max);
+                if (rangeIndex === -1) rangeIndex = priceRanges.length - 1;
+
+                if (visibleRanges.has(rangeIndex) &&
+                    statusMatch &&
+                    emirateMatch &&
+                    (!cat || categoryFilters.has(cat)) &&
+                    (!bed || bedroomFilters.has(bed))) {
+                    marker.addTo(map);
+                    visibleCount++;
+                    if (price > 0 && price < currentMinPrice) currentMinPrice = price;
+                    if (price > currentMaxPrice) currentMaxPrice = price;
+                } else {
+                    marker.removeFrom(map);
+                }
+            });
+
+            // Update Label
+            const labelEl = document.getElementById('price-range-label');
+            if (visibleCount > 0) {
+                const fMin = currentMinPrice === Infinity ? "N/A" : new Intl.NumberFormat('en-AE', { style: 'currency', currency: 'AED', maximumFractionDigits: 0 }).format(currentMinPrice);
+                const fMax = currentMaxPrice === 0 ? "N/A" : new Intl.NumberFormat('en-AE', { style: 'currency', currency: 'AED', maximumFractionDigits: 0 }).format(currentMaxPrice);
+                labelEl.textContent = `Matches: ${visibleCount} | ${fMin} - ${fMax}`;
+            } else {
+                labelEl.textContent = "No properties match your filters";
+            }
+        }
+
+        function loadMarkers() {
+            markers.forEach(marker => map.removeLayer(marker));
+            markers = [];
+            const locationGroups = {};
+
+            responseData[0].hits.forEach(loc => {
+                // Since this data might not have exact coordinates (_geoloc), 
+                // Let's use some dummy coordinates around Dubai if missing, or use _geoloc if present.
+                // We'll generate a slight offset based on property ID if missing to spread them out
+                let lat = 25.276987;
+                let lng = 55.296249;
+
+                if (loc._geoloc && loc._geoloc.lat && loc._geoloc.lng) {
+                    // The property-for-sale index stores Latitude (~25) in "lng", and Longitude (~55) in "lat".
+                    lat = loc._geoloc.lng;
+                    lng = loc._geoloc.lat;
+                } else {
+                    // Generate a fake coordinate offset around Dubai center just to show on map since the data didn't include _geoloc initially
+                    const offset = (loc.project_id || 0) * 0.0001;
+                    lat = 25.0 + (Math.random() * 0.3) - 0.15;
+                    lng = 55.2 + (Math.random() * 0.3) - 0.15;
+                }
+
+                const key = `${lat},${lng}`;
+                if (!locationGroups[key]) locationGroups[key] = [];
+                locationGroups[key].push(loc);
+            });
+
+            Object.entries(locationGroups).forEach(([coords, locations]) => {
+                const coordsArr = coords.split(',');
+                const lat = Number(coordsArr[0]);
+                const lng = Number(coordsArr[1]);
+
+                // Assuming all clustered locations base logic on the first one or we take lowest price
+                const validPrices = locations.map(l => l.price || l.starting_price).filter(p => p !== null && p !== undefined);
+                const lowestPrice = validPrices.length > 0 ? Math.min(...validPrices) : 0;
+                const color = getMarkerColor(lowestPrice);
+
+                const markerIcon = L.divIcon({
+                    className: "custom-marker",
+                    html: `<div class="marker-inner" style="background: ${color};"></div>`,
+                    iconSize: [24, 34],
+                    iconAnchor: [12, 34],
+                    popupAnchor: [0, -30]
+                });
+
+                const marker = L.marker([lat, lng], { icon: markerIcon });
+                marker.price = lowestPrice;
+                marker.propertyData = locations[0];
+
+                marker.bindPopup(() => {
+                    const filteredLocations = locations.filter(loc => {
+                        let cat = undefined;
+                        if (loc.categories_v2) {
+                            if (Array.isArray(loc.categories_v2) && loc.categories_v2.length > 0) {
+                                cat = loc.categories_v2[0].name.en[0];
+                            } else if (loc.categories_v2.name && loc.categories_v2.name.en) {
+                                cat = Array.isArray(loc.categories_v2.name.en) ? loc.categories_v2.name.en[0] : loc.categories_v2.name.en;
+                            }
+                        }
+                        if (!cat && loc.category_v2 && loc.category_v2.slug_paths) {
+                            cat = Array.isArray(loc.category_v2.slug_paths) ? loc.category_v2.slug_paths[0] : loc.category_v2.slug_paths;
+                        }
+
+                        let rawBed = loc.bedrooms || loc.bedrooms_name || loc.size_name;
+                        let bed = undefined;
+                        if (rawBed !== undefined && rawBed !== null) {
+                            bed = String(rawBed).toLowerCase();
+                            if (bed === '0' || bed.includes('studio')) bed = 'Studio';
+                            else if (!isNaN(parseInt(bed))) bed = parseInt(bed) + ' BHK';
+                            else bed = String(rawBed);
+                        }
+
+                        const propertyPrice = loc.price || loc.starting_price || 0;
+                        let rIdx = priceRanges.findIndex(r => propertyPrice <= r.max);
+                        if (rIdx === -1) rIdx = priceRanges.length - 1;
+
+                        return visibleRanges.has(rIdx) && (!cat || categoryFilters.has(cat)) && (!bed || bedroomFilters.has(bed));
+                    });
+
+                    const popupContent = filteredLocations.map(loc => {
+                        const propertyPrice = loc.price || loc.starting_price;
+                        const priceFmt = propertyPrice ? new Intl.NumberFormat('en-AE', { style: 'currency', currency: 'AED', maximumFractionDigits: 0 }).format(propertyPrice) : 'TBA';
+                        const pName = (loc.name && loc.name.en) ? loc.name.en : (loc.name || 'Unnamed Project');
+                        let bldgName = loc.building && loc.building.name && loc.building.name.en ? loc.building.name.en : '';
+                        let devName = '';
+                        if (loc.developer && loc.developer.name && loc.developer.name.en) {
+                            devName = loc.developer.name.en;
+                        } else if (loc.agent_profile && loc.agent_profile.name) {
+                            devName = loc.agent_profile.name;
+                        } else if (loc.agent && loc.agent.name && loc.agent.name.en) {
+                            devName = loc.agent.name.en;
+                        }
+
+                        if (devName) {
+                            devName = Array.isArray(devName) ? devName[0] : (typeof devName === 'object' ? devName.en || 'Unknown Builder' : String(devName));
+                        }
+
+                        let cat = '';
+                        if (loc.categories_v2) {
+                            if (Array.isArray(loc.categories_v2) && loc.categories_v2.length > 0) {
+                                cat = loc.categories_v2[0].name.en[0];
+                            } else if (loc.categories_v2.name && loc.categories_v2.name.en) {
+                                cat = Array.isArray(loc.categories_v2.name.en) ? loc.categories_v2.name.en[0] : loc.categories_v2.name.en;
+                            }
+                        }
+                        if (!cat && loc.category_v2 && loc.category_v2.slug_paths) {
+                            cat = Array.isArray(loc.category_v2.slug_paths) ? loc.category_v2.slug_paths[0] : loc.category_v2.slug_paths;
+                        }
+
+                        let rawBed = loc.bedrooms || loc.bedrooms_name || loc.size_name;
+                        let bed = undefined;
+                        if (rawBed !== undefined && rawBed !== null) {
+                            bed = String(rawBed).toLowerCase();
+                            if (bed === '0' || bed.includes('studio')) bed = 'Studio';
+                            else if (!isNaN(parseInt(bed))) bed = parseInt(bed) + ' BHK';
+                            else bed = String(rawBed);
+                        }
+
+                        // Strip HTML tags from description
+                        let tempDesc = loc.description && loc.description.en ? loc.description.en : (loc.description_short || 'No description available.');
+                        if (typeof tempDesc === 'string') tempDesc = tempDesc.replace(/<[^>]+>/g, '');
+
+                        // Extract cover image
+                        let coverImgUrl = '';
+                        if (loc.images && loc.images.length > 0) {
+                            coverImgUrl = loc.images[0].main;
+                        } else if (loc.photos && loc.photos.length > 0) {
+                            coverImgUrl = loc.photos[0].url; // For standard property-for-sale index
+                        }
+
+                        return `
+                            <div class="popup-list-item">
+                                ${coverImgUrl ? `<img src="${coverImgUrl}" style="width: 100%; height: 120px; object-fit: cover; border-radius: 8px; margin-bottom: 12px;" />` : ''}
+                                <div class="popup-price">${priceFmt}</div>
+                                <div class="popup-type">${pName}</div>
+                                <div class="popup-meta">
+                                    ${bldgName ? `<span>🏢 ${bldgName}</span>` : (devName ? `<span>🏢 ${devName}</span>` : '')}
+                                    ${cat ? `<span>📍 ${cat}</span>` : ''}
+                                    ${bed ? `<span>🛏️ ${bed}</span>` : ''}
+                                </div>
+                                <div class="popup-desc">${tempDesc}</div>
+                                <a href="${(loc.absolute_url && loc.absolute_url.en) ? loc.absolute_url.en : (loc.absolute_url || '#')}" target="_blank" class="btn-view">View Property</a>
+                            </div>
+                        `;
+                    }).join('');
+
+                    return `<div class="popup-inner">${popupContent || '<div class="popup-list-item">No matching projects.</div>'}</div>`;
+                });
+
+                markers.push(marker);
+                marker.addTo(map);
+            });
+        }
+
+        function setOverlay(show, errorText = null) {
+            const overlay = document.getElementById('loader-overlay');
+            const msgObj = document.getElementById('loader-msg');
+            if (show) {
+                overlay.classList.add('active');
+                if (errorText) {
+                    msgObj.innerHTML = `<div style="color: #ef4444; font-size: 40px; margin-bottom: 16px;">⚠️</div><div style="color: #ef4444;">${errorText}</div>`;
+                } else {
+                    msgObj.innerHTML = `Fetching Market Data...`;
+                }
+            } else {
+                overlay.classList.remove('active');
+            }
+        }
+
+        let currentBatchId = 0;
+
+        async function loadMap() {
+            setOverlay(true, null);
+            document.getElementById('debug-log').innerHTML = ''; // Clear debug log
+
+            const selectedStatus = document.getElementById('statusSelect').value;
+            const selectedEmirate = parseInt(document.getElementById('emiratesSelect').value);
+
+            let filterString = `("categories_v2.slug_paths":"property-for-sale/residential")`;
+
+            if (selectedEmirate !== 0) {
+                filterString += ` AND ("city.id"=${selectedEmirate})`;
+            }
+
+            if (selectedStatus === 'offplan') {
+                filterString += ` AND ("completion_status":"off_plan")`;
+            } else if (selectedStatus === 'ready') {
+                filterString += ` AND ("completion_status":"completed")`;
+            }
+
+            const batchId = Date.now();
+            currentBatchId = batchId;
+
+            const cacheKey = `radar_cache_${encodeURIComponent(filterString)}`;
+            const cachedObject = await getCache(cacheKey);
+
+            // 1 day expiry check
+            const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+            if (cachedObject && cachedObject.timestamp && (Date.now() - cachedObject.timestamp < ONE_DAY_MS)) {
+                // Use Cache
+                document.getElementById('loader-msg').innerHTML = `Loading from cache...`;
+                document.getElementById('debug-log').innerHTML += "Using cached data for this filter.<br>";
+
+                responseData = cachedObject.data;
+                loadMarkers();
+                createLegend();
+                createCategoryFilters();
+                createBedroomFilters();
+                updateMarkerVisibility();
+                setOverlay(false);
+                return;
+            }
+
+            const fetchPage = async (pageNum) => {
+                const payload = {
+                    requests: [{
+                        indexName: "by_price_asc_property-for-sale-residential.com",
+                        query: "",
+                        params: `page=${pageNum}&hitsPerPage=1000&attributesToRetrieve=%5B%22bedrooms%22%2C%22bedrooms_name%22%2C%22size_name%22%2C%22price%22%2C%22completion_status%22%2C%22building%22%2C%22categories_v2%22%2C%22category_v2%22%2C%22city%22%2C%22developer%22%2C%22agent%22%2C%22agent_profile%22%2C%22downpayment%22%2C%22images%22%2C%22photos%22%2C%22name%22%2C%22neighborhoods%22%2C%22slug%22%2C%22starting_price%22%2C%22absolute_url%22%2C%22completion_percentage%22%2C%22location%22%2C%22location_path%22%2C%22description%22%2C%22description_short%22%2C%22project_id%22%2C%22has_cpl_whatsapp%22%2C%22is_cpl_project%22%2C%22is_cpl_location%22%2C%22has_agency_lead_whatsapp%22%2C%22_geoloc%22%5D&attributesToHighlight=%5B%5D&filters=${encodeURIComponent(filterString)}`
+                    }]
+                };
+
+                const res = await fetch("https://wd0ptz13zs-dsn.algolia.net/1/indexes/*/queries?x-algolia-agent=Algolia%20for%20JavaScript%20(4.24.0)&x-algolia-api-key=cef139620248f1bc328a00fddc7107a6&x-algolia-application-id=WD0PTZ13ZS", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+                return await res.json();
+            };
+
+            try {
+                let initialData = await fetchPage(0);
+                if (!initialData || !initialData.results || !initialData.results[0] || !initialData.results[0].hits) {
+                    throw new Error("Invalid format received from API.");
+                }
+
+                let allHits = initialData.results[0].hits;
+                let nbPages = initialData.results[0].nbPages || 1;
+
+                // DEV PURPOSE ONLY: Limit API calls to 2 
+                nbPages = Math.min(nbPages, 2);
+
+                document.getElementById('loader-msg').innerHTML = `Fetching map data...<br><span style="font-size:12px;opacity:0.8">Page 1 of ${nbPages}</span>`;
+
+                for (let i = 1; i < nbPages; i++) {
+                    if (currentBatchId !== batchId) return; // User changed filter, abort
+                    await new Promise(r => setTimeout(r, 300));
+
+                    document.getElementById('loader-msg').innerHTML = `Fetching map data...<br><span style="font-size:12px;opacity:0.8">Page ${i + 1} of ${nbPages}</span>`;
+                    let pageData = await fetchPage(i);
+                    allHits = allHits.concat(pageData.results[0].hits);
+                }
+
+                if (currentBatchId !== batchId) return; // Verify again after loop ends
+
+                responseData = initialData.results;
+                responseData[0].hits = allHits; // Update data root to our aggregated list
+
+                // Store aggregated data gracefully back into the browser DB caching layer
+                await setCache(cacheKey, { timestamp: Date.now(), data: responseData });
+
+                if (allHits.length === 0) {
+                    document.getElementById('debug-log').innerHTML += "Algolia returned 0 properties for the selected filter.<br>";
+                } else {
+                    document.getElementById('debug-log').innerHTML += `Successfully downloaded all ${allHits.length} matched properties.<br>`;
+                }
+
+                loadMarkers();
+                createLegend();
+                createCategoryFilters();
+                createBedroomFilters();
+                updateMarkerVisibility();
+                setOverlay(false);
+
+            } catch (err) {
+                if (currentBatchId === batchId) {
+                    console.error("API Fetch Error:", err);
+                    setOverlay(true, `Error loading data: ${err.message}<br><br>The API may be blocking access or missing data.`);
+                }
+            }
+        }
+
+        $(function () {
+            loadMap();
+
+            document.getElementById('statusSelect').addEventListener('change', loadMap);
+
+            document.getElementById('emiratesSelect').addEventListener('change', function (e) {
+                const emirate = e.target.value;
+                switch (emirate) {
+                    case '0': map.setView([25.276987, 55.296249], 8); break; // Zoom out to show all
+                    case '2': map.setView([25.276987, 55.296249], 11); break;
+                    case '3': map.setView([24.453884, 54.377344], 11); break;
+                    case '12': map.setView([25.357290, 55.391109], 11); break;
+                    case '14': map.setView([25.411111, 55.435278], 11); break;
+                    case '11': map.setView([25.789097, 55.937594], 11); break;
+                    case '13': map.setView([25.123169, 56.326874], 11); break;
+                    case '15': map.setView([25.565111, 55.553200], 11); break;
+                    case '39': map.setView([24.1302, 55.8023], 11); break; // Al Ain coords
+                }
+                loadMap();
+            });
+        });
+    </script>
+</body>
+
+</html>

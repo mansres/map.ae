@@ -1,33 +1,47 @@
-# Rental Map Demo
-A simple single-page HTML project that shows how rental ads can be displayed on an interactive map. It includes easy filters so users can quickly narrow down listings. This project is meant for learning and experimenting with front-end ideas, not for production use.
+# Rental Radar
 
-## Features
-- Interactive map view  
-- User-friendly filters (price, type, etc.)  
-- Lightweight single HTML file  
-- No backend required  
-- Easy to extend or modify
+Rental Radar is a static, map-first rental browser. It groups listings at the
+same location, keeps the map and result cards in sync, and filters live by
+location, price band, property type, and bedrooms.
 
-## How It Works
-Everything runs in the browser.  
-You can replace the sample data with any allowed data source. The map loads using standard map libraries, and the filter panel updates the visible markers in real time.
+## Run locally
 
-## Getting Started
+The page uses browser modules, so serve the folder rather than opening
+index.html directly from file URLs.
 
-1. Clone the repo  
-2. Open `index.html` in your browser  
-3. Modify the sample data or UI as needed
+    python -m http.server 4173 --bind 127.0.0.1
 
-## Folder Structure
-/
-│── index.html # Main file containing the UI, map, and filters
+Then open http://127.0.0.1:4173/.
 
+The page reads from the existing authorized worker endpoint by default. A host
+can override it before the application module loads:
 
-## Disclaimer
-This project is for educational and personal study only.  
-It is **not** affiliated with or endorsed by Dubizzle or any other platform.  
-Do not use this project to access, scrape, or interact with third-party APIs without proper permission.  
-If you build on this demo, replace all sample or placeholder data with your own permitted sources.
+    <script>
+      window.RENTAL_RADAR_API_URL = 'https://your-authorized-endpoint.example';
+    </script>
 
-## License
-MIT License (or any license you prefer)
+Supported response envelopes are:
+
+- [{ "hits": [...] }]
+- { "results": [{ "hits": [...] }] }
+- { "hits": [...] }
+
+## Test
+
+The pure data/filtering logic uses Node's built-in test runner:
+
+    npm test
+
+To also run the regression test against the supplied full sample payload
+without committing that large data file:
+
+    $env:RENTAL_FIXTURE = 'C:\path\to\pasted-text.txt'
+    npm test
+
+## Notes
+
+- The source payload's geographic values can arrive with latitude and
+  longitude reversed; Rental Radar validates and normalizes either order.
+- Map pins, popups, grouped result cards, summary metrics, and distribution
+  bars all use the same filtered listing set.
+- Use only data sources you are authorized to access or display.
