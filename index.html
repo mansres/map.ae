@@ -1,126 +1,24 @@
 <!doctype html>
 <html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#f4f7fb">
-    <meta name="description" content="A live, filterable rental map with price and bedroom controls.">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#f7f8fa" />
+    <meta
+      name="description"
+      content="Rental Radar is a live, map-first rental search experience."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
     <title>Rental Radar</title>
-
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
-        rel="stylesheet">
-
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
-    <link rel="stylesheet" href="./assets/rental-radar.css">
-</head>
-
-<body>
-    <div id="map" aria-label="Rental listings map"></div>
-
-    <main id="app" class="app-shell">
-        <aside id="desktop-panel" aria-label="Rental Radar workspace">
-            <section id="sidebar">
-                <header class="sidebar-header">
-                    <div class="brand">
-                        <span class="brand-kicker">Live rental map</span>
-                        <h1>Rental Radar</h1>
-                        <p>Compare asking rents by location.</p>
-                    </div>
-                    <div class="header-actions">
-                        <button id="refresh-data" class="icon-button" type="button" aria-label="Refresh rental data"
-                            title="Refresh rental data">&#x21bb;</button>
-                        <button id="sidebar-toggle" class="icon-button" type="button" aria-label="Collapse workspace"
-                            aria-expanded="true" title="Collapse workspace">&#x2039;</button>
-                    </div>
-                </header>
-
-                <div id="app-status" role="status" aria-live="polite" aria-atomic="true"></div>
-
-                <section id="summary-grid" aria-label="Filtered rental summary">
-                    <article class="summary-card">
-                        <span class="summary-label">Listings</span>
-                        <strong id="summary-listings" class="summary-value">0</strong>
-                    </article>
-                    <article class="summary-card">
-                        <span class="summary-label">Locations</span>
-                        <strong id="summary-locations" class="summary-value">0</strong>
-                    </article>
-                    <article id="summary-median" class="summary-card">
-                        <span class="summary-label">Median price</span>
-                        <strong id="summary-median-value" class="summary-value">—</strong>
-                    </article>
-                    <article id="load-progress" class="summary-card">
-                        <span class="summary-label">Data progress</span>
-                        <strong id="load-progress-value" class="summary-value">—</strong>
-                    </article>
-                </section>
-
-                <section id="price-distribution" aria-labelledby="price-distribution-title">
-                    <h2 id="price-distribution-title">Visible price mix</h2>
-                    <div id="distribution-list" class="distribution-list"></div>
-                </section>
-
-                <div id="active-filters" aria-label="Active filters"></div>
-
-                <section id="filter-panel" aria-label="Rental filters">
-                    <fieldset class="filter-group">
-                        <legend>Location</legend>
-                        <label class="visually-hidden" for="city-select">Emirate</label>
-                        <select id="city-select" class="select-control"></select>
-                    </fieldset>
-
-                    <fieldset class="filter-group price-range-group">
-                        <legend>Price range (AED)</legend>
-                        <div id="price-range-filters" class="price-range-controls">
-                            <label for="minimum-price">Min
-                                <input id="minimum-price" class="price-input" type="number" inputmode="numeric"
-                                    min="0" step="1000" placeholder="Any" aria-label="Minimum price in AED">
-                            </label>
-                            <label for="maximum-price">Max
-                                <input id="maximum-price" class="price-input" type="number" inputmode="numeric"
-                                    min="0" step="1000" placeholder="Any" aria-label="Maximum price in AED">
-                            </label>
-                        </div>
-                    </fieldset>
-
-                    <fieldset class="filter-group">
-                        <legend>
-                            <span>Bedrooms</span>
-                            <span id="bedroom-actions" class="filter-actions"></span>
-                        </legend>
-                        <div id="bedroom-filters" class="filter-chips" aria-label="Bedroom filters"></div>
-                    </fieldset>
-
-                    <button id="reset-filters" type="button">Reset all filters</button>
-                </section>
-
-            </section>
-        </aside>
-
-        <nav id="mobile-toolbar" aria-label="Map controls">
-            <button id="open-filters" type="button">Filters</button>
-        </nav>
-
-        <div id="sheet-backdrop" aria-hidden="true"></div>
-
-        <section id="filter-sheet" class="mobile-sheet" role="dialog" aria-modal="false"
-            aria-labelledby="filter-sheet-title" aria-hidden="true">
-            <header class="sheet-header">
-                <h2 id="filter-sheet-title">Filters</h2>
-                <button class="sheet-close" type="button" data-close-sheet aria-label="Close filters">&times;</button>
-            </header>
-            <div id="filter-sheet-content" class="sheet-content"></div>
-        </section>
-
-    </main>
-
-    <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script defer src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
-    <script type="module" src="./assets/rental-radar.js"></script>
-</body>
-
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>Rental Radar needs JavaScript enabled to browse listings.</noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>

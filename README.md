@@ -1,47 +1,53 @@
 # Rental Radar
 
-Rental Radar is a static, map-first rental browser. It groups listings at the
-same location, keeps the map and result cards in sync, and filters live by
-location, a continuous price range, and bedrooms.
+Rental Radar is a mobile-first rental map built with React, TypeScript,
+Tailwind, Leaflet, and clustered markers. It keeps the map, cards, filters,
+and loading state synchronized from one normalized listing model.
 
-## Run locally
+## Product behavior
 
-The page uses browser modules, so serve the folder rather than opening
-index.html directly from file URLs.
+- Search neighbourhoods and listing text locally as data progressively loads.
+- Filter by city, min/max AED budget, bedrooms, and home type.
+- Browse color-coded price markers, clustered locations, result cards, and a
+  selected property preview.
+- Keep recent searches, saved searches, favorites, theme, and active filters
+  in browser storage.
+- Load all advertised endpoint pages with a maximum of three concurrent
+  requests; stale city requests are cancelled and failed pages can be retried.
 
-    python -m http.server 4173 --bind 127.0.0.1
+The app uses the existing authorized worker endpoint by default. Set
+`window.RENTAL_RADAR_API_URL` before the app loads only when hosting an
+authorized alternative.
 
-Then open http://127.0.0.1:4173/.
+## Development
 
-The page reads from the existing authorized worker endpoint by default. A host
-can override it before the application module loads:
+```powershell
+npm ci
+npm run dev
+```
 
-    <script>
-      window.RENTAL_RADAR_API_URL = 'https://your-authorized-endpoint.example';
-    </script>
+Run unit tests and create the production output:
 
-Supported response envelopes are:
+```powershell
+npm test
+npm run build
+```
 
-- [{ "hits": [...] }]
-- { "results": [{ "hits": [...] }] }
-- { "hits": [...] }
+`dist/` is the deployable static site. Vite is configured with `base: './'`,
+so the same output works at a GitHub Pages project URL such as
+`https://mansres.github.io/map.ae/`.
 
-## Test
+## GitHub Pages
 
-The pure data/filtering logic uses Node's built-in test runner:
+The included workflow at `.github/workflows/deploy-pages.yml` builds and
+deploys `dist/` when `main` is pushed. In the GitHub repository settings,
+choose **GitHub Actions** as the Pages source once.
 
-    npm test
+## Data safeguards
 
-To also run the regression test against the supplied full sample payload
-without committing that large data file:
-
-    $env:RENTAL_FIXTURE = 'C:\path\to\pasted-text.txt'
-    npm test
-
-## Notes
-
-- The source payload's geographic values can arrive with latitude and
-  longitude reversed; Rental Radar validates and normalizes either order.
-- Map pins, popups, grouped result cards, summary metrics, and distribution
-  bars all use the same filtered listing set.
-- Use only data sources you are authorized to access or display.
+- Supports `[{ hits: [...] }]`, `{ results: [{ hits: [...] }] }`, and
+  `{ hits: [...] }` response envelopes.
+- Normalizes malformed optional fields and validates listing URLs.
+- Detects both conventional and reversed UAE latitude/longitude payloads.
+- Uses the same individual-listing predicate for marker groups and cards,
+  preventing a matching rental from being hidden by a colocated listing.
