@@ -287,6 +287,14 @@ function uniqueValues(values) {
     return [...new Set(values.filter((value) => value !== null && value !== undefined && value !== ''))];
 }
 
+function compareListingsByPrice(left, right) {
+    const leftPrice = left.price ?? Number.POSITIVE_INFINITY;
+    const rightPrice = right.price ?? Number.POSITIVE_INFINITY;
+    return leftPrice - rightPrice
+        || left.title.localeCompare(right.title)
+        || left.id.localeCompare(right.id);
+}
+
 /**
  * Group only listings that already match active filters. Listings without
  * map-safe coordinates are deliberately excluded from map location groups.
@@ -309,22 +317,20 @@ export function groupVisibleListings(listings, filters = {}) {
     }
 
     return [...groups.values()].map((group) => {
-        const pricedListings = group.listings.filter((listing) => listing.price !== null);
+        const sortedListings = [...group.listings].sort(compareListingsByPrice);
+        const pricedListings = sortedListings.filter((listing) => listing.price !== null);
         const lowestPrice = pricedListings.length
             ? Math.min(...pricedListings.map((listing) => listing.price))
             : null;
-        const representative = [...group.listings].sort((left, right) => {
-            const leftPrice = left.price ?? Number.POSITIVE_INFINITY;
-            const rightPrice = right.price ?? Number.POSITIVE_INFINITY;
-            return leftPrice - rightPrice || left.title.localeCompare(right.title);
-        })[0];
+        const representative = sortedListings[0];
 
         return {
             ...group,
-            count: group.listings.length,
+            listings: sortedListings,
+            count: sortedListings.length,
             lowestPrice,
-            propertyTypes: uniqueValues(group.listings.map((listing) => listing.propertyType)),
-            bedrooms: uniqueValues(group.listings.map((listing) => listing.bedrooms)).sort((a, b) => a - b),
+            propertyTypes: uniqueValues(sortedListings.map((listing) => listing.propertyType)),
+            bedrooms: uniqueValues(sortedListings.map((listing) => listing.bedrooms)).sort((a, b) => a - b),
             neighborhood: representative?.neighborhood ?? null,
             imageUrl: representative?.imageUrl ?? null,
             representative

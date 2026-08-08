@@ -182,6 +182,31 @@ test('one filter predicate drives both matching and exact-coordinate grouping', 
   assert.deepEqual(groups[0].listings.map((listing) => listing.id).sort(), ['a', 'b']);
 });
 
+test('location groups order rentals by price with deterministic ties and unavailable prices last', () => {
+  const listings = [
+    normalizeListing(rawListing({ objectID: 'unpriced', name: 'Unpriced home', price: null }), 0),
+    normalizeListing(rawListing({ objectID: 'high', name: 'Higher price', price: 36000 }), 1),
+    normalizeListing(rawListing({ objectID: 'tie-b', name: 'Same title', price: 34000 }), 2),
+    normalizeListing(rawListing({ objectID: 'tie-a', name: 'Same title', price: 34000 }), 3),
+    normalizeListing(rawListing({ objectID: 'cheapest', name: 'A first title', price: 34000 }), 4),
+    normalizeListing(rawListing({ objectID: 'middle', name: 'Middle price', price: 35900 }), 5)
+  ];
+
+  const [group] = groupVisibleListings(listings);
+
+  assert.deepEqual(group.listings.map((listing) => listing.id), [
+    'cheapest',
+    'tie-a',
+    'tie-b',
+    'middle',
+    'high',
+    'unpriced'
+  ]);
+  assert.equal(group.lowestPrice, 34000);
+  assert.equal(group.representative.id, 'cheapest');
+  assert.equal(group.listings[0], group.representative);
+});
+
 test('empty active facet sets produce no matches and no map groups', () => {
   const listing = normalizeListing(rawListing(), 0);
   const filters = {

@@ -650,11 +650,22 @@ button {
 }
 
 .popup-card__more {
+  width: 100%;
   margin: 0;
   padding: 9px 14px;
-  color: #64748b;
+  background: #fff;
+  color: var(--primary);
+  cursor: pointer;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 800;
+  text-align: left;
+}
+
+.popup-card__more:hover,
+.popup-card__more:focus-visible {
+  background: #eaf0ff;
+  outline: none;
+  text-decoration: underline;
 }
 
 .fatal-state,

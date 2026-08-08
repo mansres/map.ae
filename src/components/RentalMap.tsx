@@ -1,4 +1,4 @@
-import { memo, useEffect } from 'react';
+import { memo, useEffect, useState } from 'react';
 import type { Map as LeafletMap } from 'leaflet';
 import L from 'leaflet';
 import {
@@ -13,6 +13,8 @@ import {
 
 import { rentalPriceColor } from '../../assets/rental-core.js';
 import type { RentalCity as City, RentalGroup, RentalMapBounds } from '../types/rental';
+
+const POPUP_LISTING_BATCH_SIZE = 20;
 
 type RentalMapProps = {
     city: City;
@@ -93,6 +95,16 @@ function CityController({ city }: { city: City }) {
 
 function PopupContent({ group }: { group: RentalGroup }) {
     const listing = group.representative;
+    const [visibleListingCount, setVisibleListingCount] = useState(POPUP_LISTING_BATCH_SIZE);
+    const detailListings = group.listings.slice(1);
+    const visibleListings = detailListings.slice(0, visibleListingCount);
+    const remainingCount = Math.max(0, detailListings.length - visibleListingCount);
+    const nextBatchCount = Math.min(POPUP_LISTING_BATCH_SIZE, remainingCount);
+
+    useEffect(() => {
+        setVisibleListingCount(POPUP_LISTING_BATCH_SIZE);
+    }, [group.key]);
+
     const meta = [
         listing?.bedrooms !== null && listing?.bedrooms !== undefined ? bedroomLabel(listing.bedrooms) : null,
         listing?.bathrooms ? `${listing.bathrooms} bath${listing.bathrooms === 1 ? '' : 's'}` : null,
@@ -109,9 +121,9 @@ function PopupContent({ group }: { group: RentalGroup }) {
                 {meta.length ? <p>{meta.join(' · ')}</p> : null}
                 {listing?.listingUrl ? <a href={listing.listingUrl} target="_blank" rel="noopener noreferrer">View listing</a> : null}
             </div>
-            {group.listings.length > 1 ? (
+            {detailListings.length ? (
                 <div className="popup-card__list" aria-label="Listings at this location">
-                    {group.listings.slice(0, 6).map((child) => (
+                    {visibleListings.map((child) => (
                         <div className="popup-card__listing" key={child.id}>
                             <span>{child.title}</span>
                             <strong>{formatPrice(child.price)}</strong>
@@ -119,7 +131,15 @@ function PopupContent({ group }: { group: RentalGroup }) {
                             {child.listingUrl ? <a href={child.listingUrl} target="_blank" rel="noopener noreferrer">View</a> : null}
                         </div>
                     ))}
-                    {group.listings.length > 6 ? <p className="popup-card__more">+{group.listings.length - 6} more rentals</p> : null}
+                    {remainingCount ? (
+                        <button
+                            className="popup-card__more"
+                            type="button"
+                            onClick={() => setVisibleListingCount((current) => current + POPUP_LISTING_BATCH_SIZE)}
+                        >
+                            +{nextBatchCount} more rental{nextBatchCount === 1 ? '' : 's'}
+                        </button>
+                    ) : null}
                 </div>
             ) : null}
         </article>
