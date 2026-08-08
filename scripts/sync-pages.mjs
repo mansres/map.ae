@@ -11,7 +11,11 @@ if (!generatedAssets.startsWith(`${projectRoot}${sep}`) || !distAssets.startsWit
     throw new Error('Refusing to synchronize Pages files outside the project.');
 }
 
-const compiledIndex = await readFile(resolve(distRoot, 'index.html'), 'utf8');
+// Vite can preserve the source HTML's CRLF while injecting bundle tags with
+// LF. Normalize the tracked Pages entry so it never contains mixed endings or
+// stray carriage returns that fail repository whitespace checks.
+const compiledIndex = (await readFile(resolve(distRoot, 'index.html'), 'utf8'))
+    .replace(/\r\n?/g, '\n');
 if (compiledIndex.includes('main.tsx') || compiledIndex.includes('/src/')) {
     throw new Error('The Pages entry still references source files instead of the production bundle.');
 }
