@@ -8,6 +8,7 @@ popup.
 ## Product behavior
 
 - Load Dubai rental listings progressively from the configured search endpoint.
+- Filter from the bottom-corner drawer; one bedroom and AED 47K maximum are selected by default.
 - Color location markers with ten fixed annual-price bands from AED 0–20K to AED 80K+.
 - Browse every rental at a location from its marker popup.
 - Use standard OpenStreetMap by default, with Light, Dark, and Satellite base-map choices.

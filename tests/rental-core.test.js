@@ -132,6 +132,19 @@ test('minimum and maximum price filters use an inclusive continuous range', () =
     assert.equal(matchesFilters(above, filters), false);
 });
 
+test('the default map filters keep one-bedroom rentals up to AED 47K', () => {
+  const matching = normalizeListing(rawListing({ objectID: 'matching', price: 47000, bedrooms: 1 }), 0);
+  const tooExpensive = normalizeListing(rawListing({ objectID: 'expensive', price: 47001, bedrooms: 1 }), 1);
+  const wrongBedrooms = normalizeListing(rawListing({ objectID: 'two-bed', price: 45000, bedrooms: 2 }), 2);
+  const filters = { maximumPrice: 47000, bedrooms: [1] };
+
+  assert.equal(matchesFilters(matching, filters), true);
+  assert.equal(matchesFilters(tooExpensive, filters), false);
+  assert.equal(matchesFilters(wrongBedrooms, filters), false);
+  assert.deepEqual(groupVisibleListings([matching, tooExpensive, wrongBedrooms], filters)
+    .flatMap((group) => group.listings.map((listing) => listing.id)), ['matching']);
+});
+
 test('one filter predicate drives both matching and exact-coordinate grouping', () => {
   const listings = [
     normalizeListing(rawListing({ objectID: 'a', price: 55000 }), 0),
