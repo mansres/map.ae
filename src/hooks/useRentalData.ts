@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { extractSearchPage, groupVisibleListings, normalizeListing } from '../../assets/rental-core.js';
+import { extractSearchPage, facetValues, groupVisibleListings, normalizeListing } from '../../assets/rental-core.js';
 import type {
     RentalCity,
     RentalDataStatus,
+    RentalFacets,
+    RentalFilters,
     RentalGroup,
     RentalListing,
     RentalSearchPage,
@@ -38,6 +40,11 @@ export const CITIES = Object.freeze([
 ] satisfies readonly RentalCity[]);
 
 export const DEFAULT_CITY_ID = '2';
+export const DEFAULT_RENTAL_FILTERS: Readonly<RentalFilters> = Object.freeze({
+    maxPrice: 47_000,
+    bedrooms: Object.freeze([1]),
+    propertyTypes: null
+});
 
 export type RentalFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
@@ -57,6 +64,10 @@ export interface UseRentalDataResult {
     retry: () => void;
     listings: readonly RentalListing[];
     groups: readonly RentalGroup[];
+    facets: RentalFacets;
+    filters: RentalFilters;
+    setFilters: (patch: Partial<RentalFilters>) => void;
+    resetFilters: () => void;
     status: RentalDataStatus;
     isLoading: boolean;
     error: Error | null;
@@ -233,6 +244,11 @@ export function useRentalData(options: UseRentalDataOptions = {}): UseRentalData
     const fetcher = options.fetcher ?? defaultFetch;
     const city = cityForId(options.initialCityId ?? DEFAULT_CITY_ID);
     const [data, setData] = useState<DataSnapshot>(createEmptySnapshot);
+    const [filters, setFiltersState] = useState<RentalFilters>(() => ({
+        maxPrice: DEFAULT_RENTAL_FILTERS.maxPrice,
+        bedrooms: [...(DEFAULT_RENTAL_FILTERS.bedrooms ?? [])],
+        propertyTypes: null
+    }));
     const sessionRef = useRef<LoadSession | null>(null);
     const generationRef = useRef(0);
 
@@ -383,7 +399,31 @@ export function useRentalData(options: UseRentalDataOptions = {}): UseRentalData
         })();
     }, [isCurrentSession, loadPages, publish, refresh]);
 
-    const groups = useMemo<RentalGroup[]>(() => groupVisibleListings(data.listings), [data.listings]);
+    const setFilters = useCallback((patch: Partial<RentalFilters>) => {
+        setFiltersState((current) => ({
+            ...current,
+            ...patch,
+            bedrooms: patch.bedrooms === undefined ? current.bedrooms : patch.bedrooms ? [...patch.bedrooms] : null,
+            propertyTypes: patch.propertyTypes === undefined
+                ? current.propertyTypes
+                : patch.propertyTypes ? [...patch.propertyTypes] : null
+        }));
+    }, []);
+
+    const resetFilters = useCallback(() => {
+        setFiltersState({
+            maxPrice: DEFAULT_RENTAL_FILTERS.maxPrice,
+            bedrooms: [...(DEFAULT_RENTAL_FILTERS.bedrooms ?? [])],
+            propertyTypes: null
+        });
+    }, []);
+
+    const facets = useMemo<RentalFacets>(() => facetValues(data.listings), [data.listings]);
+    const groups = useMemo<RentalGroup[]>(() => groupVisibleListings(data.listings, {
+        maximumPrice: filters.maxPrice,
+        bedrooms: filters.bedrooms,
+        propertyTypes: filters.propertyTypes
+    }), [data.listings, filters]);
 
     return {
         city,
@@ -391,6 +431,10 @@ export function useRentalData(options: UseRentalDataOptions = {}): UseRentalData
         retry,
         listings: data.listings,
         groups,
+        facets,
+        filters,
+        setFilters,
+        resetFilters,
         status: data.status,
         isLoading: data.isLoading,
         error: data.error,

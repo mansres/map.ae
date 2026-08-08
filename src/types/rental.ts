@@ -73,6 +73,12 @@ export interface RentalFacets {
     propertyTypes: readonly RentalFacet<string>[];
 }
 
+export interface RentalFilters {
+    maxPrice: number | null;
+    bedrooms: readonly number[] | null;
+    propertyTypes: readonly string[] | null;
+}
+
 export interface RentalSearchPage {
     hits: readonly unknown[];
     page: number;

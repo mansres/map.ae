@@ -1,16 +1,25 @@
-import { lazy, Suspense, useCallback, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import type { Map as LeafletMap } from 'leaflet';
-import { LocateFixed } from 'lucide-react';
+import { Filter, LocateFixed, X } from 'lucide-react';
 
 import { RENTAL_PRICE_BANDS } from '../assets/rental-core.js';
 import { useRentalData } from './hooks/useRentalData';
-import type { RentalGroup, RentalMapBounds, RentalPriceBand } from './types/rental';
+import type {
+    RentalFacets,
+    RentalFilters,
+    RentalGroup,
+    RentalMapBounds,
+    RentalPriceBand
+} from './types/rental';
 
 const RentalMap = lazy(async () => {
     const module = await import('./components/RentalMap');
     return { default: module.RentalMap };
 });
+
+const PRICE_FILTER_MAXIMUM = 200_000;
+const PRICE_PRESETS = [47_000, 60_000, 80_000, 100_000] as const;
 
 function groupInBounds(group: RentalGroup, bounds: RentalMapBounds | null) {
     if (!bounds) return true;
@@ -19,6 +28,23 @@ function groupInBounds(group: RentalGroup, bounds: RentalMapBounds | null) {
         ? group.longitude >= bounds.west && group.longitude <= bounds.east
         : group.longitude >= bounds.west || group.longitude <= bounds.east;
     return latitudeMatches && longitudeMatches;
+}
+
+function formatCompactPrice(value: number) {
+    if (value >= 1_000_000) return `AED ${(value / 1_000_000).toFixed(value % 1_000_000 ? 1 : 0)}M`;
+    return `AED ${Math.round(value / 1_000)}K`;
+}
+
+function bedroomLabel(value: number) {
+    return value === 0 ? 'Studio' : `${value} bed${value === 1 ? '' : 's'}`;
+}
+
+function toggleSelection<T>(current: readonly T[] | null, value: T): readonly T[] | null {
+    if (current === null) return [value];
+    const next = new Set(current);
+    if (next.has(value)) next.delete(value);
+    else next.add(value);
+    return next.size ? [...next] : null;
 }
 
 function PriceLegend({ bands }: { bands: readonly RentalPriceBand[] }) {
@@ -41,15 +67,198 @@ function PriceLegend({ bands }: { bands: readonly RentalPriceBand[] }) {
     );
 }
 
+function FilterDrawer({
+    open,
+    filters,
+    facets,
+    resultCount,
+    onChange,
+    onReset,
+    onClose
+}: {
+    open: boolean;
+    filters: RentalFilters;
+    facets: RentalFacets;
+    resultCount: number;
+    onChange: (patch: Partial<RentalFilters>) => void;
+    onReset: () => void;
+    onClose: () => void;
+}) {
+    const bedroomOptions = useMemo(() => [...new Set([
+        0,
+        1,
+        2,
+        3,
+        4,
+        ...facets.bedrooms.map((facet) => facet.value)
+    ])].sort((left, right) => left - right), [facets.bedrooms]);
+    const sliderValue = filters.maxPrice ?? PRICE_FILTER_MAXIMUM;
+
+    return (
+        <>
+            <div
+                className={`filter-drawer-backdrop${open ? ' is-open' : ''}`}
+                onClick={onClose}
+                aria-hidden="true"
+            />
+            <aside
+                id="filter-drawer"
+                className={`filter-drawer${open ? ' is-open' : ''}`}
+                role="dialog"
+                aria-modal={open || undefined}
+                aria-labelledby="filter-drawer-title"
+                aria-hidden={!open}
+                inert={!open}
+            >
+                <header className="filter-drawer__header">
+                    <div>
+                        <span>Map settings</span>
+                        <h2 id="filter-drawer-title">Filters</h2>
+                    </div>
+                    <button type="button" className="filter-drawer__close" onClick={onClose} aria-label="Close filters">
+                        <X size={20} />
+                    </button>
+                </header>
+
+                <div className="filter-drawer__content">
+                    <section className="filter-section" aria-labelledby="maximum-rent-filter">
+                        <div className="filter-section__heading">
+                            <h3 id="maximum-rent-filter">Maximum yearly rent</h3>
+                            <strong>{filters.maxPrice === null ? 'Any price' : formatCompactPrice(filters.maxPrice)}</strong>
+                        </div>
+                        <input
+                            className="filter-price-slider"
+                            type="range"
+                            min={0}
+                            max={PRICE_FILTER_MAXIMUM}
+                            step={1_000}
+                            value={sliderValue}
+                            aria-label="Maximum yearly rent"
+                            aria-valuetext={filters.maxPrice === null ? 'Any price' : formatCompactPrice(filters.maxPrice)}
+                            onChange={(event) => onChange({ maxPrice: Number(event.target.value) })}
+                        />
+                        <div className="filter-price-limits" aria-hidden="true">
+                            <span>AED 0</span>
+                            <span>AED 200K+</span>
+                        </div>
+                        <div className="filter-option-grid" aria-label="Maximum price presets">
+                            {PRICE_PRESETS.map((value) => (
+                                <button
+                                    key={value}
+                                    type="button"
+                                    className="filter-option"
+                                    aria-pressed={filters.maxPrice === value}
+                                    onClick={() => onChange({ maxPrice: value })}
+                                >
+                                    Up to {formatCompactPrice(value).replace('AED ', '')}
+                                </button>
+                            ))}
+                            <button
+                                type="button"
+                                className="filter-option"
+                                aria-pressed={filters.maxPrice === null}
+                                onClick={() => onChange({ maxPrice: null })}
+                            >
+                                Any price
+                            </button>
+                        </div>
+                    </section>
+
+                    <section className="filter-section" aria-labelledby="bedrooms-filter">
+                        <div className="filter-section__heading">
+                            <h3 id="bedrooms-filter">Bedrooms</h3>
+                            <button type="button" onClick={() => onChange({ bedrooms: null })}>Any</button>
+                        </div>
+                        <div className="filter-option-grid">
+                            {bedroomOptions.map((value) => {
+                                const count = facets.bedrooms.find((facet) => facet.value === value)?.count;
+                                return (
+                                    <button
+                                        key={value}
+                                        type="button"
+                                        className="filter-option"
+                                        aria-pressed={filters.bedrooms?.includes(value) ?? false}
+                                        onClick={() => onChange({ bedrooms: toggleSelection(filters.bedrooms, value) })}
+                                    >
+                                        {bedroomLabel(value)}{count === undefined ? '' : ` · ${count.toLocaleString('en-AE')}`}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </section>
+
+                    <section className="filter-section" aria-labelledby="home-type-filter">
+                        <div className="filter-section__heading">
+                            <h3 id="home-type-filter">Home type</h3>
+                            <button type="button" onClick={() => onChange({ propertyTypes: null })}>Any</button>
+                        </div>
+                        <div className="filter-option-grid">
+                            {facets.propertyTypes.length ? facets.propertyTypes.map((facet) => (
+                                <button
+                                    key={facet.value}
+                                    type="button"
+                                    className="filter-option"
+                                    aria-pressed={filters.propertyTypes?.includes(facet.value) ?? false}
+                                    onClick={() => onChange({
+                                        propertyTypes: toggleSelection(filters.propertyTypes, facet.value)
+                                    })}
+                                >
+                                    {facet.value} · {facet.count.toLocaleString('en-AE')}
+                                </button>
+                            )) : <p className="filter-section__empty">Home types appear as listings load.</p>}
+                        </div>
+                    </section>
+                </div>
+
+                <footer className="filter-drawer__footer">
+                    <button type="button" className="filter-drawer__reset" onClick={onReset}>Reset</button>
+                    <button type="button" className="filter-drawer__apply" onClick={onClose}>
+                        Show {resultCount.toLocaleString('en-AE')} rentals
+                    </button>
+                </footer>
+            </aside>
+        </>
+    );
+}
+
 export function App() {
-    const { city, listings, groups, status, failedPages, retry, refresh } = useRentalData();
+    const {
+        city,
+        listings,
+        groups,
+        facets,
+        filters,
+        setFilters,
+        resetFilters,
+        status,
+        failedPages,
+        retry,
+        refresh
+    } = useRentalData();
     const [map, setMap] = useState<LeafletMap | null>(null);
     const [viewport, setViewport] = useState<RentalMapBounds | null>(null);
+    const [filtersOpen, setFiltersOpen] = useState(false);
 
     const viewportGroups = useMemo(
         () => groups.filter((group) => groupInBounds(group, viewport)),
         [groups, viewport]
     );
+    const resultCount = useMemo(
+        () => groups.reduce((total, group) => total + group.count, 0),
+        [groups]
+    );
+    const activeFilterCount = Number(filters.maxPrice !== null)
+        + Number(filters.bedrooms !== null)
+        + Number(filters.propertyTypes !== null);
+
+    useEffect(() => {
+        if (!filtersOpen) return undefined;
+        const closeOnEscape = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') setFiltersOpen(false);
+        };
+        document.addEventListener('keydown', closeOnEscape);
+        return () => document.removeEventListener('keydown', closeOnEscape);
+    }, [filtersOpen]);
 
     const handleViewportChange = useCallback((bounds: RentalMapBounds) => {
         setViewport(bounds);
@@ -83,7 +292,7 @@ export function App() {
 
             <div className="map-actions" aria-label="Map actions">
                 <button
-                    className="locate-button"
+                    className="map-action-button"
                     type="button"
                     onClick={locateUser}
                     disabled={!map}
@@ -92,7 +301,29 @@ export function App() {
                 >
                     <LocateFixed size={20} />
                 </button>
+                <button
+                    className="map-action-button filter-button"
+                    type="button"
+                    onClick={() => setFiltersOpen(true)}
+                    aria-label="Open filters"
+                    aria-controls="filter-drawer"
+                    aria-expanded={filtersOpen}
+                    title="Filters"
+                >
+                    <Filter size={20} />
+                    {activeFilterCount ? <span className="filter-button__count">{activeFilterCount}</span> : null}
+                </button>
             </div>
+
+            <FilterDrawer
+                open={filtersOpen}
+                filters={filters}
+                facets={facets}
+                resultCount={resultCount}
+                onChange={setFilters}
+                onReset={resetFilters}
+                onClose={() => setFiltersOpen(false)}
+            />
 
             {status === 'loading' && !listings.length ? (
                 <p className="map-status map-status--loading" role="status">Loading rentals…</p>

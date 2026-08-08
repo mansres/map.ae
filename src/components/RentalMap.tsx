@@ -7,7 +7,6 @@ import {
     Marker,
     Popup,
     TileLayer,
-    ZoomControl,
     useMap,
     useMapEvents
 } from 'react-leaflet';
@@ -176,7 +175,6 @@ export function RentalMap({ city, groups, onViewportChange, onMapReady }: Rental
                 </LayersControl.BaseLayer>
             </LayersControl>
 
-            <ZoomControl position="bottomright" />
             <MapReference onMapReady={onMapReady} />
             <ViewportEvents onViewportChange={onViewportChange} />
             {groups.map((group) => <RentalMarker key={group.key} group={group} />)}
