@@ -81,6 +81,16 @@ function MapReference({ onMapReady }: Pick<RentalMapProps, 'onMapReady'>) {
     return null;
 }
 
+function CityController({ city }: { city: City }) {
+    const map = useMap();
+
+    useEffect(() => {
+        map.flyTo(city.center, city.zoom, { animate: true, duration: 0.45 });
+    }, [city.center, city.id, city.zoom, map]);
+
+    return null;
+}
+
 function PopupContent({ group }: { group: RentalGroup }) {
     const listing = group.representative;
     const meta = [
@@ -176,6 +186,7 @@ export function RentalMap({ city, groups, onViewportChange, onMapReady }: Rental
             </LayersControl>
 
             <MapReference onMapReady={onMapReady} />
+            <CityController city={city} />
             <ViewportEvents onViewportChange={onViewportChange} />
             {groups.map((group) => <RentalMarker key={group.key} group={group} />)}
         </MapContainer>

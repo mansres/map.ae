@@ -7,6 +7,7 @@ import { RENTAL_PRICE_BANDS } from '../assets/rental-core.js';
 import { useRentalData } from './hooks/useRentalData';
 import type {
     RentalFacets,
+    RentalCity,
     RentalFilters,
     RentalGroup,
     RentalMapBounds,
@@ -69,18 +70,24 @@ function PriceLegend({ bands }: { bands: readonly RentalPriceBand[] }) {
 
 function FilterDrawer({
     open,
+    cities,
+    cityId,
     filters,
     facets,
     resultCount,
     onChange,
+    onCityChange,
     onReset,
     onClose
 }: {
     open: boolean;
+    cities: readonly RentalCity[];
+    cityId: string;
     filters: RentalFilters;
     facets: RentalFacets;
     resultCount: number;
     onChange: (patch: Partial<RentalFilters>) => void;
+    onCityChange: (cityId: string) => void;
     onReset: () => void;
     onClose: () => void;
 }) {
@@ -121,6 +128,24 @@ function FilterDrawer({
                 </header>
 
                 <div className="filter-drawer__content">
+                    <section className="filter-section" aria-labelledby="location-filter">
+                        <div className="filter-section__heading">
+                            <h3 id="location-filter">Location</h3>
+                        </div>
+                        <label className="filter-location-label">
+                            <span>Emirate</span>
+                            <select
+                                className="filter-location-select"
+                                value={cityId}
+                                onChange={(event) => onCityChange(event.target.value)}
+                            >
+                                {cities.map((option) => (
+                                    <option key={option.id} value={option.id}>{option.label}</option>
+                                ))}
+                            </select>
+                        </label>
+                    </section>
+
                     <section className="filter-section" aria-labelledby="maximum-rent-filter">
                         <div className="filter-section__heading">
                             <h3 id="maximum-rent-filter">Maximum yearly rent</h3>
@@ -223,7 +248,10 @@ function FilterDrawer({
 
 export function App() {
     const {
+        cities,
+        cityId,
         city,
+        setCityId,
         listings,
         groups,
         facets,
@@ -250,6 +278,10 @@ export function App() {
     const activeFilterCount = Number(filters.maxPrice !== null)
         + Number(filters.bedrooms !== null)
         + Number(filters.propertyTypes !== null);
+
+    useEffect(() => {
+        setViewport(null);
+    }, [city.id]);
 
     useEffect(() => {
         if (!filtersOpen) return undefined;
@@ -317,10 +349,13 @@ export function App() {
 
             <FilterDrawer
                 open={filtersOpen}
+                cities={cities}
+                cityId={cityId}
                 filters={filters}
                 facets={facets}
                 resultCount={resultCount}
                 onChange={setFilters}
+                onCityChange={setCityId}
                 onReset={resetFilters}
                 onClose={() => setFiltersOpen(false)}
             />
