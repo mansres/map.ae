@@ -14,9 +14,10 @@ popup.
 - Use standard OpenStreetMap by default, with Light, Dark, and Satellite base-map choices.
 - Recenter the map on the browser's current location and retry partial or failed data loads.
 
-The app uses the existing authorized worker endpoint by default. Set
-`window.RENTAL_RADAR_API_URL` before the app loads only when hosting an
-authorized alternative.
+The app uses the same browser-safe Algolia search endpoint as the proven legacy
+map implementation. Set `window.RENTAL_RADAR_API_URL` before the app loads only
+when hosting a compatible authorized proxy; proxy overrides continue to use a
+JSON request content type.
 
 ## Development
 

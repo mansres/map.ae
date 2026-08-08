@@ -15,7 +15,10 @@ import type {
 export type { RentalGroup, RentalListing } from '../types/rental';
 export type City = RentalCity;
 
-const DEFAULT_ENDPOINT = 'https://rmi.mansoor-infos.workers.dev';
+const DEFAULT_ENDPOINT = 'https://wd0ptz13zs-dsn.algolia.net/1/indexes/*/queries'
+    + '?x-algolia-agent=Algolia%20for%20JavaScript%20(4.24.0)'
+    + '&x-algolia-api-key=cef139620248f1bc328a00fddc7107a6'
+    + '&x-algolia-application-id=WD0PTZ13ZS';
 const SEARCH_INDEX = 'property-for-rent-residential.com';
 const PAGE_CONCURRENCY = 3;
 const REQUEST_RETRY_DELAYS = Object.freeze([350, 1_000]);
@@ -221,9 +224,14 @@ async function fetchRentalSearchPage(
     signal: AbortSignal,
     fetcher: RentalFetch
 ): Promise<RentalSearchPage> {
+    const isDirectAlgoliaRequest = endpoint.includes('.algolia.net/');
     const request = {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+            'Content-Type': isDirectAlgoliaRequest
+                ? 'application/x-www-form-urlencoded'
+                : 'application/json'
+        },
         body: JSON.stringify(buildRentalSearchPayload(cityId, page)),
         signal
     } satisfies RequestInit;
