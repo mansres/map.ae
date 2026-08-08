@@ -18,6 +18,8 @@ export type City = RentalCity;
 const DEFAULT_ENDPOINT = 'https://rmi.mansoor-infos.workers.dev';
 const SEARCH_INDEX = 'property-for-rent-residential.com';
 const PAGE_CONCURRENCY = 3;
+const REQUEST_RETRY_DELAYS = Object.freeze([350, 1_000]);
+const RETRYABLE_HTTP_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
 export const RENTAL_PRICE_LIMITS = Object.freeze({ minimum: 0, maximum: 1_000_000 });
 
 const RETRIEVED_ATTRIBUTES = Object.freeze([
@@ -168,6 +170,25 @@ function isAbortError(error: unknown) {
             || 'code' in error && (error as { code?: unknown }).code === 20);
 }
 
+function waitForRetry(delay: number, signal: AbortSignal) {
+    return new Promise<void>((resolve, reject) => {
+        if (signal.aborted) {
+            reject(new DOMException('The request was aborted.', 'AbortError'));
+            return;
+        }
+
+        const abort = () => {
+            clearTimeout(timeout);
+            reject(new DOMException('The request was aborted.', 'AbortError'));
+        };
+        const timeout = setTimeout(() => {
+            signal.removeEventListener('abort', abort);
+            resolve();
+        }, delay);
+        signal.addEventListener('abort', abort, { once: true });
+    });
+}
+
 /** Kept public so contract tests can inspect the Algolia-compatible request. */
 export function buildRentalSearchPayload(cityId: string, page: number): RentalSearchRequestPayload {
     const filters = [
@@ -200,17 +221,34 @@ async function fetchRentalSearchPage(
     signal: AbortSignal,
     fetcher: RentalFetch
 ): Promise<RentalSearchPage> {
-    const response = await fetcher(endpoint, {
+    const request = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(buildRentalSearchPayload(cityId, page)),
         signal
-    });
-    if (!response.ok) {
+    } satisfies RequestInit;
+
+    for (let attempt = 0; attempt <= REQUEST_RETRY_DELAYS.length; attempt += 1) {
+        let response: Response;
+        try {
+            response = await fetcher(endpoint, request);
+        } catch (error) {
+            if (isAbortError(error) || attempt === REQUEST_RETRY_DELAYS.length) throw error;
+            await waitForRetry(REQUEST_RETRY_DELAYS[attempt], signal);
+            continue;
+        }
+
+        if (response.ok) return extractSearchPage(await response.json());
+
         const suffix = response.statusText ? `: ${response.statusText}` : '';
-        throw new Error(`HTTP ${response.status}${suffix}`);
+        const error = new Error(`HTTP ${response.status}${suffix}`);
+        if (!RETRYABLE_HTTP_STATUSES.has(response.status) || attempt === REQUEST_RETRY_DELAYS.length) {
+            throw error;
+        }
+        await waitForRetry(REQUEST_RETRY_DELAYS[attempt], signal);
     }
-    return extractSearchPage(await response.json());
+
+    throw new Error('The rental request could not be completed.');
 }
 
 function acceptPage(session: LoadSession, page: RentalSearchPage) {

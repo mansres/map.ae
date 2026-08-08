@@ -366,7 +366,7 @@ export function App() {
             {status === 'error' && !listings.length ? (
                 <section className="fatal-state" role="alert">
                     <h1>We couldn’t load rentals</h1>
-                    <p>Check your connection, then try again.</p>
+                    <p>The rental service is temporarily unavailable. Please try again.</p>
                     <button type="button" onClick={refresh}>Retry loading</button>
                 </section>
             ) : null}
