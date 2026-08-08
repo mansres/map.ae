@@ -1,14 +1,7 @@
 declare module '*rental-core.js' {
-    export const PERCENTAGE_PRICE_COLORS: readonly string[];
-    export function createPercentagePriceScale(
-        minimum: number,
-        maximum: number
-    ): import('./rental').RentalPriceScaleBand[];
-    export function percentagePriceBandIndex(
-        price: number | null,
-        minimum: number,
-        maximum: number
-    ): number;
+    export const RENTAL_PRICE_BANDS: readonly import('./rental').RentalPriceBand[];
+    export function rentalPriceBandIndex(price: number | null): number;
+    export function rentalPriceColor(price: number | null, fallback?: string): string;
 
     export function extractSearchPage(payload: unknown): import('./rental').RentalSearchPage;
     export function normalizeListing(raw: unknown, index?: number): import('./rental').RentalListing;

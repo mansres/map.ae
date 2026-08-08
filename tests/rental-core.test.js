@@ -2,13 +2,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
-  createPercentagePriceScale,
+  RENTAL_PRICE_BANDS,
   extractHits,
   groupVisibleListings,
   isSafeHttpUrl,
   matchesFilters,
   normalizeListing,
-  percentagePriceBandIndex
+  rentalPriceBandIndex,
+  rentalPriceColor
 } from '../assets/rental-core.js';
 
 function rawListing(overrides = {}) {
@@ -88,21 +89,29 @@ test('only http and https URLs are accepted for external links', () => {
   assert.equal(isSafeHttpUrl(null), false);
 });
 
-test('percentage price scale creates five live 20 percent intervals', () => {
-  const scale = createPercentagePriceScale(0, 100000);
-  assert.equal(scale.length, 5);
-  assert.deepEqual(scale.map((band) => [band.minimum, band.maximum]), [
-    [0, 20000],
-    [20000, 40000],
-    [40000, 60000],
-    [60000, 80000],
-    [80000, 100000]
+test('fixed rental price bands use the requested colors and lower-edge ownership', () => {
+  assert.deepEqual(RENTAL_PRICE_BANDS.map(({ label, color }) => [label, color]), [
+    ['0–20K', '#8E44AD'],
+    ['20–30K', '#2980B9'],
+    ['30–35K', '#00BBD4'],
+    ['35–40K', '#009688'],
+    ['40–45K', '#27AE60'],
+    ['45–50K', '#F1C40F'],
+    ['50–55K', '#F39C12'],
+    ['55–60K', '#E67E22'],
+    ['60–80K', '#E91E63'],
+    ['80K+', '#C0392B']
   ]);
-  assert.equal(percentagePriceBandIndex(20000, 0, 100000), 0);
-  assert.equal(percentagePriceBandIndex(20001, 0, 100000), 1);
-  assert.equal(percentagePriceBandIndex(100000, 0, 100000), 4);
-  assert.equal(percentagePriceBandIndex(250000, 0, 100000), 4);
-  assert.equal(percentagePriceBandIndex(null, 0, 100000), -1);
+
+  assert.deepEqual(
+    [0, 20000, 20001, 30000, 30001, 35000, 35001, 40000, 40001, 45000,
+      45001, 50000, 50001, 55000, 55001, 60000, 60001, 80000, 80001, 100000, 250000]
+      .map(rentalPriceBandIndex),
+    [0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 9]
+  );
+  assert.equal(rentalPriceBandIndex(null), -1);
+  assert.equal(rentalPriceColor(null), '#64748b');
+  assert.equal(rentalPriceColor(250000), '#C0392B');
 });
 
 test('minimum and maximum price filters use an inclusive continuous range', () => {
@@ -156,6 +165,7 @@ test('one filter predicate drives both matching and exact-coordinate grouping', 
   assert.equal(groups[0].latitude, 25.2048);
   assert.equal(groups[0].longitude, 55.2708);
   assert.equal(groups[0].lowestPrice, 53000);
+  assert.equal(rentalPriceColor(groups[0].lowestPrice), '#F39C12');
   assert.deepEqual(groups[0].listings.map((listing) => listing.id).sort(), ['a', 'b']);
 });
 

@@ -55,8 +55,9 @@ export interface RentalMapBounds {
     west: number;
 }
 
-export interface RentalPriceScaleBand {
+export interface RentalPriceBand {
     index: number;
+    label: string;
     color: string;
     minimum: number;
     maximum: number;
@@ -70,26 +71,6 @@ export interface RentalFacet<TValue extends string | number> {
 export interface RentalFacets {
     bedrooms: readonly RentalFacet<number>[];
     propertyTypes: readonly RentalFacet<string>[];
-}
-
-/**
- * A null facet selection means "Any". An empty array is intentionally
- * distinct: it means the user explicitly deselected every value.
- */
-export interface RentalFilters {
-    minPrice: number | null;
-    maxPrice: number | null;
-    bedrooms: readonly number[] | null;
-    propertyTypes: readonly string[] | null;
-    searchTerm: string;
-}
-
-export interface RentalFilterPatch {
-    minPrice?: number | string | null;
-    maxPrice?: number | string | null;
-    bedrooms?: Iterable<number> | null;
-    propertyTypes?: Iterable<string> | null;
-    searchTerm?: string | null;
 }
 
 export interface RentalSearchPage {

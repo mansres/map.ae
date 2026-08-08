@@ -4,42 +4,33 @@
  * verify.
  */
 
-export const PERCENTAGE_PRICE_COLORS = Object.freeze([
-    '#15803d',
-    '#65a30d',
-    '#ca8a04',
-    '#ea580c',
-    '#dc2626'
+export const RENTAL_PRICE_BANDS = Object.freeze([
+    Object.freeze({ index: 0, label: '0–20K', minimum: 0, maximum: 20_000, color: '#8E44AD' }),
+    Object.freeze({ index: 1, label: '20–30K', minimum: 20_000, maximum: 30_000, color: '#2980B9' }),
+    Object.freeze({ index: 2, label: '30–35K', minimum: 30_000, maximum: 35_000, color: '#00BBD4' }),
+    Object.freeze({ index: 3, label: '35–40K', minimum: 35_000, maximum: 40_000, color: '#009688' }),
+    Object.freeze({ index: 4, label: '40–45K', minimum: 40_000, maximum: 45_000, color: '#27AE60' }),
+    Object.freeze({ index: 5, label: '45–50K', minimum: 45_000, maximum: 50_000, color: '#F1C40F' }),
+    Object.freeze({ index: 6, label: '50–55K', minimum: 50_000, maximum: 55_000, color: '#F39C12' }),
+    Object.freeze({ index: 7, label: '55–60K', minimum: 55_000, maximum: 60_000, color: '#E67E22' }),
+    Object.freeze({ index: 8, label: '60–80K', minimum: 60_000, maximum: 80_000, color: '#E91E63' }),
+    Object.freeze({ index: 9, label: '80K+', minimum: 80_000, maximum: Number.POSITIVE_INFINITY, color: '#C0392B' })
 ]);
 
 /**
- * Build five equal price intervals between the active minimum and maximum.
- * Values are percentages of the user's selected range, so the legend and map
- * remain meaningful whether the budget ceiling is AED 80k or AED 800k.
+ * Return the fixed annual-price band for a rental. Exact thresholds stay in
+ * the lower band (AED 20,000 is purple, AED 30,000 is blue, and so on).
  */
-export function createPercentagePriceScale(minimum, maximum) {
-    const safeMinimum = Math.max(0, asFiniteNumber(minimum) ?? 0);
-    const candidateMaximum = Math.max(0, asFiniteNumber(maximum) ?? 0);
-    const safeMaximum = candidateMaximum > safeMinimum ? candidateMaximum : safeMinimum + 1;
-    const interval = (safeMaximum - safeMinimum) / PERCENTAGE_PRICE_COLORS.length;
-
-    return PERCENTAGE_PRICE_COLORS.map((color, index) => ({
-        index,
-        color,
-        minimum: safeMinimum + interval * index,
-        maximum: index === PERCENTAGE_PRICE_COLORS.length - 1
-            ? safeMaximum
-            : safeMinimum + interval * (index + 1)
-    }));
-}
-
-export function percentagePriceBandIndex(price, minimum, maximum) {
+export function rentalPriceBandIndex(price) {
     const value = asFiniteNumber(price);
     if (value === null) return -1;
-    const scale = createPercentagePriceScale(minimum, maximum);
-    if (value <= scale[0].minimum) return 0;
-    const match = scale.findIndex((band) => value <= band.maximum);
-    return match === -1 ? scale.length - 1 : match;
+    const match = RENTAL_PRICE_BANDS.findIndex((band) => value <= band.maximum);
+    return match === -1 ? RENTAL_PRICE_BANDS.length - 1 : match;
+}
+
+export function rentalPriceColor(price, fallback = '#64748b') {
+    const index = rentalPriceBandIndex(price);
+    return index === -1 ? fallback : RENTAL_PRICE_BANDS[index].color;
 }
 
 const UAE_BOUNDS = Object.freeze({
