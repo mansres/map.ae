@@ -118,10 +118,7 @@ function FilterDrawer({
                 inert={!open}
             >
                 <header className="filter-drawer__header">
-                    <div>
-                        <span>Map settings</span>
-                        <h2 id="filter-drawer-title">Filters</h2>
-                    </div>
+                    <h2 id="filter-drawer-title">Rental Radar</h2>
                     <button type="button" className="filter-drawer__close" onClick={onClose} aria-label="Close filters">
                         <X size={20} />
                     </button>
@@ -187,6 +184,7 @@ function FilterDrawer({
                                 Any price
                             </button>
                         </div>
+                        <PriceLegend bands={RENTAL_PRICE_BANDS} />
                     </section>
 
                     <section className="filter-section" aria-labelledby="bedrooms-filter">
@@ -319,8 +317,6 @@ export function App() {
                     onMapReady={setMap}
                 />
             </Suspense>
-
-            <PriceLegend bands={RENTAL_PRICE_BANDS} />
 
             <div className="map-actions" aria-label="Map actions">
                 <button

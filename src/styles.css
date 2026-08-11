@@ -214,19 +214,6 @@ button {
   border-bottom: 1px solid #e2e8f0;
 }
 
-.filter-drawer__header > div {
-  display: grid;
-  gap: 2px;
-}
-
-.filter-drawer__header span {
-  color: var(--primary);
-  font-size: 10px;
-  font-weight: 850;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
 .filter-drawer__header h2 {
   margin: 0;
   color: #172033;
@@ -409,18 +396,9 @@ button {
 }
 
 .price-legend {
-  position: absolute;
-  z-index: 500;
-  right: auto;
-  bottom: max(12px, env(safe-area-inset-bottom));
-  left: max(12px, env(safe-area-inset-left));
-  max-width: min(820px, calc(100vw - 92px));
-  padding: 10px 12px;
-  border: 1px solid var(--surface-border);
-  border-radius: 14px;
-  background: var(--surface);
-  box-shadow: var(--shadow-sm);
-  backdrop-filter: blur(16px);
+  width: 100%;
+  padding-top: 14px;
+  border-top: 1px solid #e2e8f0;
 }
 
 .price-legend > strong {
@@ -734,12 +712,6 @@ button {
 }
 
 @media (max-width: 640px) {
-  .price-legend {
-    right: 72px;
-    max-width: none;
-    padding: 9px 10px;
-  }
-
   .price-legend__scale {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
