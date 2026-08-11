@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import type { Map as LeafletMap } from 'leaflet';
 import { Filter, LocateFixed, X } from 'lucide-react';
@@ -21,6 +21,7 @@ const RentalMap = lazy(async () => {
 
 const PRICE_FILTER_MAXIMUM = 200_000;
 const PRICE_PRESETS = [47_000, 60_000, 80_000, 100_000] as const;
+const AUTO_DISMISS_DELAY = 5_000;
 
 function groupInBounds(group: RentalGroup, bounds: RentalMapBounds | null) {
     if (!bounds) return true;
@@ -78,6 +79,7 @@ function FilterDrawer({
     onChange,
     onCityChange,
     onReset,
+    onInteraction,
     onClose
 }: {
     open: boolean;
@@ -89,6 +91,7 @@ function FilterDrawer({
     onChange: (patch: Partial<RentalFilters>) => void;
     onCityChange: (cityId: string) => void;
     onReset: () => void;
+    onInteraction: () => void;
     onClose: () => void;
 }) {
     const bedroomOptions = useMemo(() => [...new Set([
@@ -116,6 +119,12 @@ function FilterDrawer({
                 aria-labelledby="filter-drawer-title"
                 aria-hidden={!open}
                 inert={!open}
+                onPointerDownCapture={onInteraction}
+                onTouchStartCapture={onInteraction}
+                onKeyDownCapture={onInteraction}
+                onFocusCapture={onInteraction}
+                onWheelCapture={onInteraction}
+                onScrollCapture={onInteraction}
             >
                 <header className="filter-drawer__header">
                     <h2 id="filter-drawer-title">Rental Radar</h2>
@@ -264,6 +273,36 @@ export function App() {
     const [map, setMap] = useState<LeafletMap | null>(null);
     const [viewport, setViewport] = useState<RentalMapBounds | null>(null);
     const [filtersOpen, setFiltersOpen] = useState(false);
+    const autoWelcomeHandledRef = useRef(false);
+    const autoDismissActiveRef = useRef(false);
+    const autoDismissTimeoutRef = useRef<number | null>(null);
+
+    const clearAutoDismiss = useCallback(() => {
+        if (autoDismissTimeoutRef.current === null) return;
+        window.clearTimeout(autoDismissTimeoutRef.current);
+        autoDismissTimeoutRef.current = null;
+    }, []);
+
+    const cancelAutoDismiss = useCallback(() => {
+        autoDismissActiveRef.current = false;
+        clearAutoDismiss();
+    }, [clearAutoDismiss]);
+
+    const closeFilterDrawer = useCallback(() => {
+        autoWelcomeHandledRef.current = true;
+        cancelAutoDismiss();
+        setFiltersOpen(false);
+    }, [cancelAutoDismiss]);
+
+    const openFilterDrawer = useCallback(() => {
+        autoWelcomeHandledRef.current = true;
+        cancelAutoDismiss();
+        setFiltersOpen(true);
+    }, [cancelAutoDismiss]);
+
+    const handleFilterDrawerInteraction = useCallback(() => {
+        cancelAutoDismiss();
+    }, [cancelAutoDismiss]);
 
     const viewportGroups = useMemo(
         () => groups.filter((group) => groupInBounds(group, viewport)),
@@ -284,10 +323,35 @@ export function App() {
     useEffect(() => {
         if (!filtersOpen) return undefined;
         const closeOnEscape = (event: KeyboardEvent) => {
-            if (event.key === 'Escape') setFiltersOpen(false);
+            if (event.key === 'Escape') closeFilterDrawer();
         };
         document.addEventListener('keydown', closeOnEscape);
         return () => document.removeEventListener('keydown', closeOnEscape);
+    }, [closeFilterDrawer, filtersOpen]);
+
+    useEffect(() => {
+        if (status !== 'ready' || !map || autoWelcomeHandledRef.current) return;
+        autoWelcomeHandledRef.current = true;
+        autoDismissActiveRef.current = true;
+        setFiltersOpen(true);
+    }, [map, status]);
+
+    useEffect(() => {
+        if (!filtersOpen || !autoDismissActiveRef.current) return undefined;
+
+        const timeout = window.setTimeout(() => {
+            if (autoDismissTimeoutRef.current !== timeout || !autoDismissActiveRef.current) return;
+            autoDismissTimeoutRef.current = null;
+            autoDismissActiveRef.current = false;
+            setFiltersOpen(false);
+        }, AUTO_DISMISS_DELAY);
+        autoDismissTimeoutRef.current = timeout;
+
+        return () => {
+            if (autoDismissTimeoutRef.current !== timeout) return;
+            window.clearTimeout(timeout);
+            autoDismissTimeoutRef.current = null;
+        };
     }, [filtersOpen]);
 
     const handleViewportChange = useCallback((bounds: RentalMapBounds) => {
@@ -332,7 +396,7 @@ export function App() {
                 <button
                     className="map-action-button filter-button"
                     type="button"
-                    onClick={() => setFiltersOpen(true)}
+                    onClick={openFilterDrawer}
                     aria-label="Open filters"
                     aria-controls="filter-drawer"
                     aria-expanded={filtersOpen}
@@ -353,7 +417,8 @@ export function App() {
                 onChange={setFilters}
                 onCityChange={setCityId}
                 onReset={resetFilters}
-                onClose={() => setFiltersOpen(false)}
+                onInteraction={handleFilterDrawerInteraction}
+                onClose={closeFilterDrawer}
             />
 
             {status === 'loading' && !listings.length ? (
