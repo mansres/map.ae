@@ -409,7 +409,7 @@ export function App() {
     }, [cancelAutoDismiss]);
 
     const viewportGroups = useMemo(
-        () => groups.filter((group) => groupInBounds(group, viewport)),
+        () => viewport ? groups.filter((group) => groupInBounds(group, viewport)) : [],
         [groups, viewport]
     );
     const resultCount = useMemo(

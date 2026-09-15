@@ -217,16 +217,16 @@ export function buildRentalSearchPayload(
 ): RentalSearchRequestPayload {
     const minimumPrice = filters.minPrice ?? RENTAL_PRICE_LIMITS.minimum;
     const maximumPrice = filters.maxPrice ?? RENTAL_PRICE_LIMITS.maximum;
-    const filters = [
+    const filterClauses = [
         '("categories_v2.slug_paths":"property-for-rent/residential")',
         `(price:${minimumPrice} TO ${maximumPrice})`
     ];
-    if (cityId !== '0') filters.push(`("city.id"=${cityId})`);
+    if (cityId !== '0') filterClauses.push(`("city.id"=${cityId})`);
     if (filters.minSize !== null || filters.maxSize !== null) {
-        filters.push(`(size:${filters.minSize ?? 0} TO ${filters.maxSize ?? Number.MAX_SAFE_INTEGER})`);
+        filterClauses.push(`(size:${filters.minSize ?? 0} TO ${filters.maxSize ?? Number.MAX_SAFE_INTEGER})`);
     }
     if (filters.bedrooms !== null && filters.bedrooms.length) {
-        filters.push(`(${filters.bedrooms.map((value) => `bedrooms=${value}`).join(' OR ')})`);
+        filterClauses.push(`(${filters.bedrooms.map((value) => `bedrooms=${value}`).join(' OR ')})`);
     }
 
     const params = new URLSearchParams();
@@ -235,7 +235,7 @@ export function buildRentalSearchPayload(
     params.set('attributesToHighlight', '[]');
     params.set('attributesToRetrieve', JSON.stringify(RETRIEVED_ATTRIBUTES));
     params.set('facets', '[]');
-    params.set('filters', filters.join(' AND '));
+    params.set('filters', filterClauses.join(' AND '));
 
     return {
         requests: [{
@@ -250,6 +250,7 @@ async function fetchRentalSearchPage(
     endpoint: string,
     cityId: string,
     page: number,
+    filters: RentalFilters,
     signal: AbortSignal,
     fetcher: RentalFetch
 ): Promise<RentalSearchPage> {
@@ -261,7 +262,7 @@ async function fetchRentalSearchPage(
                 ? 'application/x-www-form-urlencoded'
                 : 'application/json'
         },
-        body: JSON.stringify(buildRentalSearchPayload(cityId, page)),
+        body: JSON.stringify(buildRentalSearchPayload(cityId, page, filters)),
         signal
     } satisfies RequestInit;
 
@@ -313,6 +314,7 @@ function cloneForRetry(session: LoadSession, generation: number): LoadSession {
     return {
         generation,
         cityId: session.cityId,
+        filters: cloneFilters(session.filters),
         controller: new AbortController(),
         listings: [...session.listings],
         seenIds: new Set(session.seenIds),
@@ -371,6 +373,7 @@ export function useRentalData(options: UseRentalDataOptions = {}): UseRentalData
                         endpoint,
                         session.cityId,
                         pageNumber,
+                        session.filters,
                         session.controller.signal,
                         fetcher
                     );
@@ -391,13 +394,14 @@ export function useRentalData(options: UseRentalDataOptions = {}): UseRentalData
         );
     }, [endpoint, fetcher, isCurrentSession, publish]);
 
-    const startFullLoad = useCallback((requestedCityId: string) => {
+    const startFullLoad = useCallback((requestedCityId: string, requestedFilters: RentalFilters) => {
         stopCurrentSession();
         const requestedCity = cityForId(requestedCityId);
 
         const session: LoadSession = {
             generation: generationRef.current + 1,
             cityId: requestedCity.id,
+            filters: cloneFilters(requestedFilters),
             controller: new AbortController(),
             listings: [],
             seenIds: new Set(),
@@ -418,18 +422,23 @@ export function useRentalData(options: UseRentalDataOptions = {}): UseRentalData
                     endpoint,
                     requestedCity.id,
                     0,
+                    session.filters,
                     session.controller.signal,
                     fetcher
                 );
                 if (!isCurrentSession(session)) return;
 
                 session.expectedHits = firstPage.nbHits;
-                session.expectedPages = firstPage.nbPages;
+                const maximumPageCount = Math.min(
+                    firstPage.nbPages,
+                    Math.ceil(MAX_LOADED_LISTINGS / Math.max(1, firstPage.hitsPerPage))
+                );
+                session.expectedPages = maximumPageCount;
                 acceptPage(session, firstPage);
                 publish(session);
 
-                if (firstPage.nbPages > 1) {
-                    const pages = Array.from({ length: firstPage.nbPages - 1 }, (_, index) => index + 1);
+                if (maximumPageCount > 1) {
+                    const pages = Array.from({ length: maximumPageCount - 1 }, (_, index) => index + 1);
                     await loadPages(session, pages);
                 }
                 if (!isCurrentSession(session)) return;
@@ -447,28 +456,35 @@ export function useRentalData(options: UseRentalDataOptions = {}): UseRentalData
         return session;
     }, [endpoint, fetcher, isCurrentSession, loadPages, publish, stopCurrentSession]);
 
+    const serverFilters = useMemo<RentalFilters>(() => ({
+        minPrice: filters.minPrice,
+        maxPrice: filters.maxPrice,
+        minSize: filters.minSize,
+        maxSize: filters.maxSize,
+        bedrooms: filters.bedrooms ? [...filters.bedrooms] : null,
+        propertyTypes: null
+    }), [filters.bedrooms, filters.maxPrice, filters.maxSize, filters.minPrice, filters.minSize]);
+
     useEffect(() => {
         if (options.autoLoad === false) return undefined;
-        const session = startFullLoad(initialCity.id);
-        return () => {
-            if (sessionRef.current === session && !session.controller.signal.aborted) {
-                session.controller.abort();
-                sessionRef.current = null;
-            }
-        };
-    }, [initialCity.id, options.autoLoad, startFullLoad]);
+        const timeout = window.setTimeout(() => {
+            startFullLoad(cityId, serverFilters);
+        }, FILTER_DEBOUNCE_DELAY);
+        return () => window.clearTimeout(timeout);
+    }, [cityId, options.autoLoad, serverFilters, startFullLoad]);
+
+    useEffect(() => () => stopCurrentSession(), [stopCurrentSession]);
 
     const setCityId = useCallback((requestedCityId: string) => {
         const nextCity = cityForId(requestedCityId);
         if (nextCity.id === cityId) return;
         setCityIdState(nextCity.id);
         setFiltersState(createDefaultFilters());
-        startFullLoad(nextCity.id);
-    }, [cityId, startFullLoad]);
+    }, [cityId]);
 
     const refresh = useCallback(() => {
-        startFullLoad(cityId);
-    }, [cityId, startFullLoad]);
+        startFullLoad(cityId, serverFilters);
+    }, [cityId, serverFilters, startFullLoad]);
 
     const retry = useCallback(() => {
         const prior = sessionRef.current;
