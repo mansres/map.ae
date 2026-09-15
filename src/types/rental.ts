@@ -31,7 +31,6 @@ export interface RentalListing {
     latitude: number | null;
     longitude: number | null;
     coordinateKey: string | null;
-    source: Record<string, unknown>;
 }
 
 export interface RentalGroup {

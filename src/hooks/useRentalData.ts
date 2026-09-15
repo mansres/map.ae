@@ -20,7 +20,10 @@ const DEFAULT_ENDPOINT = 'https://wd0ptz13zs-dsn.algolia.net/1/indexes/*/queries
     + '&x-algolia-api-key=cef139620248f1bc328a00fddc7107a6'
     + '&x-algolia-application-id=WD0PTZ13ZS';
 const SEARCH_INDEX = 'property-for-rent-residential.com';
-const PAGE_CONCURRENCY = 3;
+const HITS_PER_PAGE = 250;
+const MAX_LOADED_LISTINGS = 5_000;
+const FILTER_DEBOUNCE_DELAY = 250;
+const PAGE_CONCURRENCY = 1;
 const REQUEST_RETRY_DELAYS = Object.freeze([350, 1_000]);
 const RETRYABLE_HTTP_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
 export const RENTAL_PRICE_LIMITS = Object.freeze({ minimum: 0, maximum: 1_000_000 });
@@ -28,8 +31,7 @@ export const RENTAL_PRICE_LIMITS = Object.freeze({ minimum: 0, maximum: 1_000_00
 const RETRIEVED_ATTRIBUTES = Object.freeze([
     'id', 'objectID', 'uuid', 'name', 'property_reference', 'price', 'bedrooms', 'bathrooms',
     'size', 'property_info', 'categories', 'categories_v2', 'category_v2', 'city', 'building',
-    'neighborhoods', 'photos', 'images', 'absolute_url', 'short_url', 'description_short',
-    'description', '_geoloc', 'payment_frequency', 'room_type'
+    'neighborhoods', 'photos', 'images', 'absolute_url', 'short_url', '_geoloc', 'room_type'
 ]);
 
 export const CITIES = Object.freeze([
@@ -101,6 +103,7 @@ interface DataSnapshot {
 interface LoadSession {
     generation: number;
     cityId: string;
+    filters: RentalFilters;
     controller: AbortController;
     listings: RentalListing[];
     seenIds: Set<string>;
@@ -147,6 +150,14 @@ function createDefaultFilters(): RentalFilters {
         maxSize: DEFAULT_RENTAL_FILTERS.maxSize,
         bedrooms: [...(DEFAULT_RENTAL_FILTERS.bedrooms ?? [])],
         propertyTypes: null
+    };
+}
+
+function cloneFilters(filters: RentalFilters): RentalFilters {
+    return {
+        ...filters,
+        bedrooms: filters.bedrooms ? [...filters.bedrooms] : null,
+        propertyTypes: filters.propertyTypes ? [...filters.propertyTypes] : null
     };
 }
 
@@ -199,16 +210,28 @@ function waitForRetry(delay: number, signal: AbortSignal) {
 }
 
 /** Kept public so contract tests can inspect the Algolia-compatible request. */
-export function buildRentalSearchPayload(cityId: string, page: number): RentalSearchRequestPayload {
+export function buildRentalSearchPayload(
+    cityId: string,
+    page: number,
+    filters: RentalFilters = createDefaultFilters()
+): RentalSearchRequestPayload {
+    const minimumPrice = filters.minPrice ?? RENTAL_PRICE_LIMITS.minimum;
+    const maximumPrice = filters.maxPrice ?? RENTAL_PRICE_LIMITS.maximum;
     const filters = [
         '("categories_v2.slug_paths":"property-for-rent/residential")',
-        `(price:${RENTAL_PRICE_LIMITS.minimum} TO ${RENTAL_PRICE_LIMITS.maximum})`
+        `(price:${minimumPrice} TO ${maximumPrice})`
     ];
     if (cityId !== '0') filters.push(`("city.id"=${cityId})`);
+    if (filters.minSize !== null || filters.maxSize !== null) {
+        filters.push(`(size:${filters.minSize ?? 0} TO ${filters.maxSize ?? Number.MAX_SAFE_INTEGER})`);
+    }
+    if (filters.bedrooms !== null && filters.bedrooms.length) {
+        filters.push(`(${filters.bedrooms.map((value) => `bedrooms=${value}`).join(' OR ')})`);
+    }
 
     const params = new URLSearchParams();
     params.set('page', String(page));
-    params.set('hitsPerPage', '1000');
+    params.set('hitsPerPage', String(HITS_PER_PAGE));
     params.set('attributesToHighlight', '[]');
     params.set('attributesToRetrieve', JSON.stringify(RETRIEVED_ATTRIBUTES));
     params.set('facets', '[]');

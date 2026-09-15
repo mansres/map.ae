@@ -237,8 +237,7 @@ export function normalizeListing(raw, index = 0) {
         longitude: coordinates?.longitude ?? null,
         coordinateKey: coordinates
             ? `${coordinates.latitude.toFixed(6)},${coordinates.longitude.toFixed(6)}`
-            : null,
-        source
+            : null
     };
 }
 
