@@ -7,7 +7,7 @@ popup.
 
 ## Product behavior
 
-- Load Dubai rental listings progressively from the configured search endpoint.
+- Load matching Dubai rental listings progressively from the configured search endpoint.
 - Filter from the bottom-corner drawer; one bedroom and AED 47K maximum are selected by default.
 - Color location markers with ten fixed annual-price bands from AED 0–20K to AED 80K+.
 - Browse every rental at a location from its marker popup.
@@ -39,6 +39,8 @@ so the same output works at a GitHub Pages project URL such as
 
 ## Data safeguards
 
+- Applies price, size, and bedroom constraints at the search service before downloading results.
+- Uses small sequential pages and caps broad searches at 5,000 listings to stay within mobile browser memory limits.
 - Supports `[{ hits: [...] }]`, `{ results: [{ hits: [...] }] }`, and
   `{ hits: [...] }` response envelopes.
 - Normalizes malformed optional fields and validates listing URLs.
