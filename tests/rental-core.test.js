@@ -132,6 +132,23 @@ test('minimum and maximum price filters use an inclusive continuous range', () =
     assert.equal(matchesFilters(above, filters), false);
 });
 
+test('minimum and maximum sqft filters use an inclusive continuous range', () => {
+  const below = normalizeListing(rawListing({ objectID: 'below', size: 749 }), 0);
+  const lower = normalizeListing(rawListing({ objectID: 'lower-size', size: 750 }), 1);
+  const inside = normalizeListing(rawListing({ objectID: 'inside-size', size: 1200 }), 2);
+  const upper = normalizeListing(rawListing({ objectID: 'upper-size', size: 1500 }), 3);
+  const above = normalizeListing(rawListing({ objectID: 'above-size', size: 1501 }), 4);
+  const unknown = normalizeListing(rawListing({ objectID: 'unknown-size', size: null }), 5);
+  const filters = { minimumSize: 750, maximumSize: 1500 };
+
+  assert.equal(matchesFilters(below, filters), false);
+  assert.equal(matchesFilters(lower, filters), true);
+  assert.equal(matchesFilters(inside, filters), true);
+  assert.equal(matchesFilters(upper, filters), true);
+  assert.equal(matchesFilters(above, filters), false);
+  assert.equal(matchesFilters(unknown, filters), false);
+});
+
 test('the default map filters keep one-bedroom rentals up to AED 47K', () => {
   const matching = normalizeListing(rawListing({ objectID: 'matching', price: 47000, bedrooms: 1 }), 0);
   const tooExpensive = normalizeListing(rawListing({ objectID: 'expensive', price: 47001, bedrooms: 1 }), 1);

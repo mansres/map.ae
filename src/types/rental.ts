@@ -74,7 +74,10 @@ export interface RentalFacets {
 }
 
 export interface RentalFilters {
+    minPrice: number | null;
     maxPrice: number | null;
+    minSize: number | null;
+    maxSize: number | null;
     bedrooms: readonly number[] | null;
     propertyTypes: readonly string[] | null;
 }

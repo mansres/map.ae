@@ -20,6 +20,7 @@ const RentalMap = lazy(async () => {
 });
 
 const PRICE_FILTER_MAXIMUM = 200_000;
+const SIZE_FILTER_MAXIMUM = 10_000;
 const PRICE_PRESETS = [47_000, 60_000, 80_000, 100_000] as const;
 const AUTO_DISMISS_DELAY = 5_000;
 
@@ -35,6 +36,85 @@ function groupInBounds(group: RentalGroup, bounds: RentalMapBounds | null) {
 function formatCompactPrice(value: number) {
     if (value >= 1_000_000) return `AED ${(value / 1_000_000).toFixed(value % 1_000_000 ? 1 : 0)}M`;
     return `AED ${Math.round(value / 1_000)}K`;
+}
+
+function formatSize(value: number) {
+    return `${value.toLocaleString('en-AE')} sqft`;
+}
+
+function formatRange(
+    minimum: number | null,
+    maximum: number | null,
+    floor: number,
+    formatValue: (value: number) => string
+) {
+    if (minimum === null && maximum === null) return 'Any';
+    if (maximum === null) return `${formatValue(minimum ?? floor)}+`;
+    return `${formatValue(minimum ?? floor)} – ${formatValue(maximum)}`;
+}
+
+function RangeSlider({
+    label,
+    minimum,
+    maximum,
+    step,
+    minValue,
+    maxValue,
+    formatValue,
+    onChange
+}: {
+    label: string;
+    minimum: number;
+    maximum: number;
+    step: number;
+    minValue: number | null;
+    maxValue: number | null;
+    formatValue: (value: number) => string;
+    onChange: (patch: { minimum?: number | null; maximum?: number | null }) => void;
+}) {
+    const resolvedMinimum = minValue ?? minimum;
+    const resolvedMaximum = maxValue ?? maximum;
+    const span = maximum - minimum;
+    const start = ((resolvedMinimum - minimum) / span) * 100;
+    const end = ((resolvedMaximum - minimum) / span) * 100;
+    const trackStyle = {
+        '--range-start': `${start}%`,
+        '--range-end': `${end}%`
+    } as CSSProperties;
+
+    return (
+        <div className="filter-range" role="group" aria-label={label} style={trackStyle}>
+            <div className="filter-range__track" aria-hidden="true" />
+            <input
+                className="filter-range__input filter-range__input--minimum"
+                type="range"
+                min={minimum}
+                max={maximum}
+                step={step}
+                value={resolvedMinimum}
+                aria-label={`Minimum ${label}`}
+                aria-valuetext={minValue === null ? `No minimum, ${formatValue(minimum)}` : formatValue(minValue)}
+                onChange={(event) => {
+                    const value = Math.min(Number(event.target.value), resolvedMaximum);
+                    onChange({ minimum: value === minimum ? null : value });
+                }}
+            />
+            <input
+                className="filter-range__input filter-range__input--maximum"
+                type="range"
+                min={minimum}
+                max={maximum}
+                step={step}
+                value={resolvedMaximum}
+                aria-label={`Maximum ${label}`}
+                aria-valuetext={maxValue === null ? `No maximum, ${formatValue(maximum)} or more` : formatValue(maxValue)}
+                onChange={(event) => {
+                    const value = Math.max(Number(event.target.value), resolvedMinimum);
+                    onChange({ maximum: value === maximum ? null : value });
+                }}
+            />
+        </div>
+    );
 }
 
 function bedroomLabel(value: number) {
@@ -102,8 +182,6 @@ function FilterDrawer({
         4,
         ...facets.bedrooms.map((facet) => facet.value)
     ])].sort((left, right) => left - right), [facets.bedrooms]);
-    const sliderValue = filters.maxPrice ?? PRICE_FILTER_MAXIMUM;
-
     return (
         <>
             <div
@@ -152,34 +230,36 @@ function FilterDrawer({
                         </label>
                     </section>
 
-                    <section className="filter-section" aria-labelledby="maximum-rent-filter">
+                    <section className="filter-section" aria-labelledby="yearly-rent-filter">
                         <div className="filter-section__heading">
-                            <h3 id="maximum-rent-filter">Maximum yearly rent</h3>
-                            <strong>{filters.maxPrice === null ? 'Any price' : formatCompactPrice(filters.maxPrice)}</strong>
+                            <h3 id="yearly-rent-filter">Yearly rent</h3>
+                            <strong>{formatRange(filters.minPrice, filters.maxPrice, 0, formatCompactPrice)}</strong>
                         </div>
-                        <input
-                            className="filter-price-slider"
-                            type="range"
-                            min={0}
-                            max={PRICE_FILTER_MAXIMUM}
+                        <RangeSlider
+                            label="yearly rent"
+                            minimum={0}
+                            maximum={PRICE_FILTER_MAXIMUM}
                             step={1_000}
-                            value={sliderValue}
-                            aria-label="Maximum yearly rent"
-                            aria-valuetext={filters.maxPrice === null ? 'Any price' : formatCompactPrice(filters.maxPrice)}
-                            onChange={(event) => onChange({ maxPrice: Number(event.target.value) })}
+                            minValue={filters.minPrice}
+                            maxValue={filters.maxPrice}
+                            formatValue={formatCompactPrice}
+                            onChange={(patch) => onChange({
+                                minPrice: patch.minimum === undefined ? filters.minPrice : patch.minimum,
+                                maxPrice: patch.maximum === undefined ? filters.maxPrice : patch.maximum
+                            })}
                         />
                         <div className="filter-price-limits" aria-hidden="true">
                             <span>AED 0</span>
                             <span>AED 200K+</span>
                         </div>
-                        <div className="filter-option-grid" aria-label="Maximum price presets">
+                        <div className="filter-option-grid" aria-label="Price presets">
                             {PRICE_PRESETS.map((value) => (
                                 <button
                                     key={value}
                                     type="button"
                                     className="filter-option"
-                                    aria-pressed={filters.maxPrice === value}
-                                    onClick={() => onChange({ maxPrice: value })}
+                                    aria-pressed={filters.minPrice === null && filters.maxPrice === value}
+                                    onClick={() => onChange({ minPrice: null, maxPrice: value })}
                                 >
                                     Up to {formatCompactPrice(value).replace('AED ', '')}
                                 </button>
@@ -187,13 +267,37 @@ function FilterDrawer({
                             <button
                                 type="button"
                                 className="filter-option"
-                                aria-pressed={filters.maxPrice === null}
-                                onClick={() => onChange({ maxPrice: null })}
+                                aria-pressed={filters.minPrice === null && filters.maxPrice === null}
+                                onClick={() => onChange({ minPrice: null, maxPrice: null })}
                             >
                                 Any price
                             </button>
                         </div>
                         <PriceLegend bands={RENTAL_PRICE_BANDS} />
+                    </section>
+
+                    <section className="filter-section" aria-labelledby="size-filter">
+                        <div className="filter-section__heading">
+                            <h3 id="size-filter">Size</h3>
+                            <strong>{formatRange(filters.minSize, filters.maxSize, 0, formatSize)}</strong>
+                        </div>
+                        <RangeSlider
+                            label="property size"
+                            minimum={0}
+                            maximum={SIZE_FILTER_MAXIMUM}
+                            step={50}
+                            minValue={filters.minSize}
+                            maxValue={filters.maxSize}
+                            formatValue={formatSize}
+                            onChange={(patch) => onChange({
+                                minSize: patch.minimum === undefined ? filters.minSize : patch.minimum,
+                                maxSize: patch.maximum === undefined ? filters.maxSize : patch.maximum
+                            })}
+                        />
+                        <div className="filter-price-limits" aria-hidden="true">
+                            <span>0 sqft</span>
+                            <span>10,000+ sqft</span>
+                        </div>
                     </section>
 
                     <section className="filter-section" aria-labelledby="bedrooms-filter">
@@ -312,7 +416,8 @@ export function App() {
         () => groups.reduce((total, group) => total + group.count, 0),
         [groups]
     );
-    const activeFilterCount = Number(filters.maxPrice !== null)
+    const activeFilterCount = Number(filters.minPrice !== null || filters.maxPrice !== null)
+        + Number(filters.minSize !== null || filters.maxSize !== null)
         + Number(filters.bedrooms !== null)
         + Number(filters.propertyTypes !== null);
 

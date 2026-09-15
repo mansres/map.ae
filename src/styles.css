@@ -309,12 +309,88 @@ button {
   box-shadow: 0 0 0 3px rgba(36, 87, 214, 0.12);
 }
 
-.filter-price-slider {
+.filter-range {
+  position: relative;
+  height: 28px;
+}
+
+.filter-range__track {
+  position: absolute;
+  top: 11px;
+  right: 0;
+  left: 0;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    #cbd5e1 0 var(--range-start),
+    var(--primary) var(--range-start) var(--range-end),
+    #cbd5e1 var(--range-end) 100%
+  );
+}
+
+.filter-range__input {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 28px;
   margin: 0;
-  accent-color: var(--primary);
-  cursor: pointer;
+  appearance: none;
+  background: transparent;
+  pointer-events: none;
+}
+
+.filter-range__input--minimum {
+  z-index: 3;
+}
+
+.filter-range__input:focus-visible {
+  z-index: 5;
+  outline: none;
+}
+
+.filter-range__input::-webkit-slider-runnable-track {
+  height: 6px;
+  background: transparent;
+}
+
+.filter-range__input::-webkit-slider-thumb {
+  width: 20px;
+  height: 20px;
+  margin-top: -7px;
+  appearance: none;
+  border: 3px solid var(--primary);
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.24);
+  cursor: grab;
+  pointer-events: auto;
+}
+
+.filter-range__input::-moz-range-track {
+  height: 6px;
+  background: transparent;
+}
+
+.filter-range__input::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 3px solid var(--primary);
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.24);
+  cursor: grab;
+  pointer-events: auto;
+}
+
+.filter-range__input:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px rgba(36, 87, 214, 0.2);
+}
+
+.filter-range__input:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 4px rgba(36, 87, 214, 0.2);
 }
 
 .filter-price-limits {

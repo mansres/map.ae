@@ -12,6 +12,10 @@ declare module '*rental-core.js' {
             maximumPrice?: number | null;
             minPrice?: number | null;
             maxPrice?: number | null;
+            minimumSize?: number | null;
+            maximumSize?: number | null;
+            minSize?: number | null;
+            maxSize?: number | null;
             bedrooms?: Iterable<number> | null;
             propertyTypes?: Iterable<string> | null;
         }

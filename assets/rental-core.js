@@ -275,11 +275,15 @@ export function matchesFilters(listing, filters = {}) {
     const bedrooms = selectedSet(filters, 'bedrooms');
     const minimumPrice = filterNumber(filters, ['minimumPrice', 'minPrice']);
     const maximumPrice = filterNumber(filters, ['maximumPrice', 'maxPrice']);
+    const minimumSize = filterNumber(filters, ['minimumSize', 'minSize', 'minimumSqft', 'minSqft']);
+    const maximumSize = filterNumber(filters, ['maximumSize', 'maxSize', 'maximumSqft', 'maxSqft']);
 
     if (!matchesSelection(listing.propertyType, types)) return false;
     if (!matchesSelection(listing.bedrooms, bedrooms)) return false;
     if (minimumPrice !== null && (listing.price === null || listing.price < minimumPrice)) return false;
     if (maximumPrice !== null && (listing.price === null || listing.price > maximumPrice)) return false;
+    if (minimumSize !== null && (listing.size === null || listing.size < minimumSize)) return false;
+    if (maximumSize !== null && (listing.size === null || listing.size > maximumSize)) return false;
     return true;
 }
 

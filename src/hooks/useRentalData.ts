@@ -46,7 +46,10 @@ export const CITIES = Object.freeze([
 
 export const DEFAULT_CITY_ID = '2';
 export const DEFAULT_RENTAL_FILTERS: Readonly<RentalFilters> = Object.freeze({
+    minPrice: null,
     maxPrice: 47_000,
+    minSize: null,
+    maxSize: null,
     bedrooms: Object.freeze([1]),
     propertyTypes: null
 });
@@ -138,7 +141,10 @@ function createEmptySnapshot(): DataSnapshot {
 
 function createDefaultFilters(): RentalFilters {
     return {
+        minPrice: DEFAULT_RENTAL_FILTERS.minPrice,
         maxPrice: DEFAULT_RENTAL_FILTERS.maxPrice,
+        minSize: DEFAULT_RENTAL_FILTERS.minSize,
+        maxSize: DEFAULT_RENTAL_FILTERS.maxSize,
         bedrooms: [...(DEFAULT_RENTAL_FILTERS.bedrooms ?? [])],
         propertyTypes: null
     };
@@ -480,7 +486,10 @@ export function useRentalData(options: UseRentalDataOptions = {}): UseRentalData
 
     const facets = useMemo<RentalFacets>(() => facetValues(data.listings), [data.listings]);
     const groups = useMemo<RentalGroup[]>(() => groupVisibleListings(data.listings, {
+        minimumPrice: filters.minPrice,
         maximumPrice: filters.maxPrice,
+        minimumSize: filters.minSize,
+        maximumSize: filters.maxSize,
         bedrooms: filters.bedrooms,
         propertyTypes: filters.propertyTypes
     }), [data.listings, filters]);
