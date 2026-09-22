@@ -100,6 +100,33 @@ function normalizePropertyType(raw) {
     return firstText(raw?.category_v2?.name) || firstText(raw?.category) || null;
 }
 
+function availabilityValue(value, positive, negative) {
+    if (typeof value === 'boolean') return value;
+    const text = firstText(value)?.toLowerCase();
+    if (positive.includes(text)) return true;
+    if (negative.includes(text)) return false;
+    return null;
+}
+
+function normalizeFurnished(raw) {
+    if (typeof raw.furnished === 'boolean') return raw.furnished;
+    return availabilityValue(propertyInfoValue(raw, 'furnished'), ['furnished'], ['unfurnished']);
+}
+
+function normalizeParking(raw) {
+    const positive = ['yes', 'true', 'available', 'covered parking', 'covered_parking'];
+    const negative = ['no', 'false', 'not available', 'no parking'];
+    const explicit = availabilityValue(raw.parking, positive, negative)
+        ?? availabilityValue(propertyInfoValue(raw, 'parking'), positive, negative);
+    if (explicit !== null) return explicit;
+    if (Array.isArray(raw.amenities_v2) && raw.amenities_v2.some((amenity) =>
+        [amenity?.value, amenity?.en].some((value) =>
+            typeof value === 'string' && ['covered_parking', 'covered parking'].includes(value.trim().toLowerCase())
+        )
+    )) return true;
+    return null;
+}
+
 function isInUae(latitude, longitude) {
     return latitude >= UAE_BOUNDS.latitude[0]
         && latitude <= UAE_BOUNDS.latitude[1]
@@ -227,6 +254,8 @@ export function normalizeListing(raw, index = 0) {
         bedrooms,
         bathrooms: asFiniteNumber(source.bathrooms),
         size: asFiniteNumber(source.size),
+        furnished: normalizeFurnished(source),
+        parking: normalizeParking(source),
         propertyType: normalizePropertyType(source),
         description: firstText(source.description_short) || firstText(source.description),
         neighborhood: placeLabel(source),
@@ -270,6 +299,12 @@ function filterNumber(filters, names) {
  */
 export function matchesFilters(listing, filters = {}) {
     if (!listing) return false;
+    for (const name of ['furnished', 'parking']) {
+        const selection = filters[name];
+        if (selection === null || selection === undefined) continue;
+        const actual = listing[name] === true ? 'yes' : listing[name] === false ? 'no' : 'na';
+        if (selection !== actual) return false;
+    }
     const types = selectedSet(filters, 'propertyTypes');
     const bedrooms = selectedSet(filters, 'bedrooms');
     const minimumPrice = filterNumber(filters, ['minimumPrice', 'minPrice']);

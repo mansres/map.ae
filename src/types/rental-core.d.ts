@@ -8,6 +8,8 @@ declare module '*rental-core.js' {
     export function matchesFilters(
         listing: import('./rental').RentalListing,
         filters?: {
+            furnished?: import('./rental').RentalAvailabilityFilter;
+            parking?: import('./rental').RentalAvailabilityFilter;
             minimumPrice?: number | null;
             maximumPrice?: number | null;
             minPrice?: number | null;

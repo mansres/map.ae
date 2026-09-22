@@ -234,3 +234,76 @@ test('empty active facet sets produce no matches and no map groups', () => {
   assert.equal(matchesFilters(listing, filters), false);
   assert.deepEqual(groupVisibleListings([listing], filters), []);
 });
+
+
+test('furnishing preserves booleans, falls back to property information, and keeps unknowns null', () => {
+  for (const value of [true, false]) {
+    assert.equal(normalizeListing(rawListing({ furnished: value })).furnished, value);
+  }
+  for (const [value, expected] of [['Furnished', true], ['Unfurnished', false], ['Partly furnished', null]]) {
+    assert.equal(normalizeListing(rawListing({
+      property_info: [{ id: 'furnished', value: { en: value } }]
+    })).furnished, expected);
+  }
+  assert.equal(normalizeListing(rawListing({
+    furnished: false, property_info: [{ id: 'furnished', value: { en: 'Furnished' } }]
+  })).furnished, false);
+  for (const furnished of [undefined, null, {}, 'unknown']) {
+    assert.equal(normalizeListing(rawListing({ furnished })).furnished, null);
+  }
+});
+
+test('parking distinguishes covered parking, explicit negatives, and unknown amenities', () => {
+  for (const amenity of [{ value: 'covered_parking' }, { en: 'Covered Parking' }]) {
+    assert.equal(normalizeListing(rawListing({ amenities_v2: [amenity] })).parking, true);
+  }
+  for (const parking of [false, 'No', 'No parking']) {
+    assert.equal(normalizeListing(rawListing({ parking })).parking, false);
+  }
+  assert.equal(normalizeListing(rawListing({ parking: true })).parking, true);
+  assert.equal(normalizeListing(rawListing({
+    property_info: [{ id: 'parking', value: { en: 'No' } }]
+  })).parking, false);
+  for (const amenities_v2 of [undefined, null, {}, [], [null, { value: 'balcony' }]]) {
+    assert.equal(normalizeListing(rawListing({ amenities_v2 })).parking, null);
+  }
+});
+
+test('availability selections match only their state and Any includes unknowns', () => {
+  for (const field of ['furnished', 'parking']) {
+    for (const [value, expected] of [[true, 'yes'], [false, 'no'], [null, 'na']]) {
+      const listing = normalizeListing(rawListing({ [field]: value }));
+      for (const selection of ['yes', 'no', 'na']) {
+        assert.equal(matchesFilters(listing, { [field]: selection }), selection === expected);
+      }
+      assert.equal(matchesFilters(listing, { [field]: null }), true);
+      assert.equal(matchesFilters(listing, {}), true);
+    }
+  }
+});
+
+test('combined availability, rent, size, and bedroom filters keep map groups in sync', () => {
+  const listings = [
+    { objectID: 'match', furnished: true, parking: false, price: 47000, size: 1000 },
+    { objectID: 'unfurnished', furnished: false, parking: false, price: 47000, size: 1000 },
+    { objectID: 'unknown-parking', furnished: true, price: 47000, size: 1000 },
+    { objectID: 'expensive', furnished: true, parking: false, price: 120000, size: 2500 }
+  ].map((values) => normalizeListing(rawListing(values)));
+  const filters = { furnished: 'yes', parking: 'no', maxPrice: 100000, maxSize: 2000, bedrooms: [1] };
+  const groups = groupVisibleListings(listings, filters);
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].count, 1);
+  assert.deepEqual(groups[0].listings.map((listing) => listing.id), ['match']);
+  assert.equal(groups[0].lowestPrice, 47000);
+  assert.equal(groupVisibleListings(listings, { ...filters, maxPrice: null, maxSize: null })[0].count, 2);
+  assert.equal(groupVisibleListings(listings, { furnished: null, parking: null })[0].count, 4);
+});
+
+test('exact rent and size caps include boundaries while unlimited endpoints include larger homes', () => {
+  const boundary = normalizeListing(rawListing({ price: 100000, size: 2000 }));
+  const larger = normalizeListing(rawListing({ price: 101000, size: 2050 }));
+  assert.equal(matchesFilters(boundary, { maxPrice: 100000, maxSize: 2000 }), true);
+  assert.equal(matchesFilters(larger, { maxPrice: 100000 }), false);
+  assert.equal(matchesFilters(larger, { maxSize: 2000 }), false);
+  assert.equal(matchesFilters(larger, { maxPrice: null, maxSize: null }), true);
+});

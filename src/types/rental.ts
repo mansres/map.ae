@@ -4,6 +4,8 @@
  * need to guess whether a property has a value.
  */
 
+export type RentalAvailabilityFilter = 'yes' | 'no' | 'na' | null;
+
 export type RentalDataStatus = 'loading' | 'partial' | 'error' | 'ready';
 
 export interface RentalCity {
@@ -22,6 +24,8 @@ export interface RentalListing {
     bedrooms: number | null;
     bathrooms: number | null;
     size: number | null;
+    furnished: boolean | null;
+    parking: boolean | null;
     propertyType: string | null;
     description: string | null;
     neighborhood: string | null;
@@ -73,6 +77,8 @@ export interface RentalFacets {
 }
 
 export interface RentalFilters {
+    furnished: RentalAvailabilityFilter;
+    parking: RentalAvailabilityFilter;
     minPrice: number | null;
     maxPrice: number | null;
     minSize: number | null;

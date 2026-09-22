@@ -19,8 +19,8 @@ const RentalMap = lazy(async () => {
     return { default: module.RentalMap };
 });
 
-const PRICE_FILTER_MAXIMUM = 200_000;
-const SIZE_FILTER_MAXIMUM = 10_000;
+const PRICE_FILTER_MAXIMUM = 100_000;
+const SIZE_FILTER_MAXIMUM = 2_000;
 const PRICE_PRESETS = [47_000, 60_000, 80_000, 100_000] as const;
 const AUTO_DISMISS_DELAY = 5_000;
 
@@ -250,7 +250,7 @@ function FilterDrawer({
                         />
                         <div className="filter-price-limits" aria-hidden="true">
                             <span>AED 0</span>
-                            <span>AED 200K+</span>
+                            <span>AED 100K+</span>
                         </div>
                         <div className="filter-option-grid" aria-label="Price presets">
                             {PRICE_PRESETS.map((value) => (
@@ -296,9 +296,35 @@ function FilterDrawer({
                         />
                         <div className="filter-price-limits" aria-hidden="true">
                             <span>0 sqft</span>
-                            <span>10,000+ sqft</span>
+                            <span>2,000+ sqft</span>
                         </div>
                     </section>
+
+                    {(['furnished', 'parking'] as const).map((name) => (
+                        <section key={name} className="filter-section" aria-labelledby={`${name}-filter`}>
+                            <div className="filter-section__heading">
+                                <h3 id={`${name}-filter`}>{name === 'furnished' ? 'Furnishing' : 'Parking'}</h3>
+                            </div>
+                            <div className="filter-option-grid">
+                                {([
+                                    { value: null, label: 'Any' },
+                                    { value: 'yes', label: name === 'furnished' ? 'Furnished' : 'Yes' },
+                                    { value: 'no', label: name === 'furnished' ? 'Unfurnished' : 'No' },
+                                    { value: 'na', label: 'N/A' }
+                                ] as const).map((option) => (
+                                    <button
+                                        key={option.value ?? 'any'}
+                                        type="button"
+                                        className="filter-option"
+                                        aria-pressed={filters[name] === option.value}
+                                        onClick={() => onChange({ [name]: option.value })}
+                                    >
+                                        {option.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </section>
+                    ))}
 
                     <section className="filter-section" aria-labelledby="bedrooms-filter">
                         <div className="filter-section__heading">
@@ -419,7 +445,9 @@ export function App() {
     const activeFilterCount = Number(filters.minPrice !== null || filters.maxPrice !== null)
         + Number(filters.minSize !== null || filters.maxSize !== null)
         + Number(filters.bedrooms !== null)
-        + Number(filters.propertyTypes !== null);
+        + Number(filters.propertyTypes !== null)
+        + Number(filters.furnished !== null)
+        + Number(filters.parking !== null);
 
     useEffect(() => {
         setViewport(null);

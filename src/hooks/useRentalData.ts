@@ -31,7 +31,8 @@ export const RENTAL_PRICE_LIMITS = Object.freeze({ minimum: 0, maximum: 1_000_00
 const RETRIEVED_ATTRIBUTES = Object.freeze([
     'id', 'objectID', 'uuid', 'name', 'property_reference', 'price', 'bedrooms', 'bathrooms',
     'size', 'property_info', 'categories', 'categories_v2', 'category_v2', 'city', 'building',
-    'neighborhoods', 'photos', 'images', 'absolute_url', 'short_url', '_geoloc', 'room_type'
+    'neighborhoods', 'photos', 'images', 'absolute_url', 'short_url', '_geoloc', 'room_type',
+    'furnished', 'parking', 'amenities_v2'
 ]);
 
 export const CITIES = Object.freeze([
@@ -53,6 +54,8 @@ export const DEFAULT_RENTAL_FILTERS: Readonly<RentalFilters> = Object.freeze({
     minSize: null,
     maxSize: null,
     bedrooms: Object.freeze([1]),
+    furnished: null,
+    parking: null,
     propertyTypes: null
 });
 
@@ -149,6 +152,8 @@ function createDefaultFilters(): RentalFilters {
         minSize: DEFAULT_RENTAL_FILTERS.minSize,
         maxSize: DEFAULT_RENTAL_FILTERS.maxSize,
         bedrooms: [...(DEFAULT_RENTAL_FILTERS.bedrooms ?? [])],
+        furnished: null,
+        parking: null,
         propertyTypes: null
     };
 }
@@ -462,6 +467,8 @@ export function useRentalData(options: UseRentalDataOptions = {}): UseRentalData
         minSize: filters.minSize,
         maxSize: filters.maxSize,
         bedrooms: filters.bedrooms ? [...filters.bedrooms] : null,
+        furnished: null,
+        parking: null,
         propertyTypes: null
     }), [filters.bedrooms, filters.maxPrice, filters.maxSize, filters.minPrice, filters.minSize]);
 
@@ -530,7 +537,9 @@ export function useRentalData(options: UseRentalDataOptions = {}): UseRentalData
         minimumSize: filters.minSize,
         maximumSize: filters.maxSize,
         bedrooms: filters.bedrooms,
-        propertyTypes: filters.propertyTypes
+        propertyTypes: filters.propertyTypes,
+        furnished: filters.furnished,
+        parking: filters.parking
     }), [data.listings, filters]);
 
     return {
